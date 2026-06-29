@@ -29,6 +29,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --frozen-lockfile
+      # next typegen generates next-env.d.ts required before tsc --noEmit
+      - run: npx next typegen
+        env:
+          BACKEND_URL: "http://localhost:8000"
       - run: npx tsc --noEmit
 
   build-and-push:
