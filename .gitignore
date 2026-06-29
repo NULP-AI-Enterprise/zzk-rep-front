@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agy rules
+agy.md
+
+# k8s plaintext secret (seal before committing)
+k8s/secret.yaml
