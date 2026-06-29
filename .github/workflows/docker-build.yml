@@ -20,10 +20,22 @@ env:
   IMAGE:    ghcr.io/nulp-ai-enterprise/zzk-rep-front
 
 jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --frozen-lockfile
+      - run: npx tsc --noEmit
+
   build-and-push:
     runs-on: ubuntu-latest
+    needs: typecheck
     permissions:
-      contents: write   # needed to commit pinned SHA back
+      contents: write
       packages: write
 
     steps:
