@@ -9,26 +9,37 @@ type Status = 'PENDING' | 'ATTACHED' | 'DETACHED';
 export default function StatusAction({
   patientId,
   currentStatus = 'PENDING',
+  suggestedDoctorId,
 }: {
   patientId: number;
   currentStatus?: Status;
+  suggestedDoctorId?: number;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]       = useState(false);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [newStatus, setNewStatus] = useState<'ATTACHED' | 'DETACHED'>(
-    currentStatus === 'ATTACHED' ? 'DETACHED' : 'ATTACHED'
+    currentStatus === 'ATTACHED' ? 'DETACHED' : 'ATTACHED',
   );
-  const [doctorId, setDoctorId] = useState('');
+  const [doctorId, setDoctorId] = useState(
+    suggestedDoctorId ? String(suggestedDoctorId) : '',
+  );
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
 
   useEffect(() => {
     if (!open) return;
     fetch('/api/admin/users')
       .then(r => r.json())
       .then((users: { id: number; role: string; first_name: string; last_name: string }[]) => {
-        setDoctors(Array.isArray(users) ? users.filter(u => u.role === 'DOCTOR') : []);
+        const docs = Array.isArray(users) ? users.filter(u => u.role === 'DOCTOR') : [];
+        // Put suggested doctor first
+        if (suggestedDoctorId) {
+          const idx = docs.findIndex(d => d.id === suggestedDoctorId);
+          if (idx > 0) docs.unshift(docs.splice(idx, 1)[0]);
+        }
+        setDoctors(docs);
+        if (suggestedDoctorId && !doctorId) setDoctorId(String(suggestedDoctorId));
       })
       .catch(() => {});
   }, [open]);
@@ -62,11 +73,8 @@ export default function StatusAction({
 
   if (!open) {
     const label =
-      currentStatus === 'PENDING'
-        ? 'Підтвердити'
-        : currentStatus === 'ATTACHED'
-        ? 'Відкріпити'
-        : 'Прикріпити';
+      currentStatus === 'PENDING'   ? 'Підтвердити' :
+      currentStatus === 'ATTACHED'  ? 'Відкріпити'  : 'Прикріпити';
     const cls =
       currentStatus === 'PENDING'
         ? 'bg-brand text-white hover:bg-brand-light'
@@ -88,14 +96,14 @@ export default function StatusAction({
   }
 
   return (
-    <div className="flex flex-col gap-2 min-w-[220px]">
+    <div className="flex flex-col gap-2 min-w-[230px]">
       <select
         value={newStatus}
         onChange={e => setNewStatus(e.target.value as 'ATTACHED' | 'DETACHED')}
         className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-brand"
       >
-        <option value="ATTACHED">Прикріпити (ATTACHED)</option>
-        <option value="DETACHED">Відхилити (DETACHED)</option>
+        <option value="ATTACHED">Прикріпити (Активний)</option>
+        <option value="DETACHED">Відкріпити (Відкріплений)</option>
       </select>
 
       {newStatus === 'ATTACHED' && (
@@ -108,6 +116,7 @@ export default function StatusAction({
           {doctors.map(d => (
             <option key={d.id} value={d.id}>
               {d.last_name} {d.first_name}
+              {d.id === suggestedDoctorId ? ' ★' : ''}
             </option>
           ))}
         </select>
@@ -116,17 +125,12 @@ export default function StatusAction({
       {error && <p className="text-red-500 text-xs">{error}</p>}
 
       <div className="flex gap-1.5">
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="flex-1 py-1.5 bg-brand text-white text-xs font-medium rounded-lg hover:bg-brand-light transition-colors disabled:opacity-50"
-        >
+        <button onClick={handleSubmit} disabled={loading}
+          className="flex-1 py-1.5 bg-brand text-white text-xs font-medium rounded-lg hover:bg-brand-light transition-colors disabled:opacity-50">
           {loading ? '...' : 'Зберегти'}
         </button>
-        <button
-          onClick={() => { setOpen(false); setError(''); }}
-          className="px-2 py-1.5 border border-gray-200 text-xs text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
-        >
+        <button onClick={() => { setOpen(false); setError(''); }}
+          className="px-2 py-1.5 border border-gray-200 text-xs text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
           ✕
         </button>
       </div>

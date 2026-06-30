@@ -12,21 +12,32 @@ async function getToken() {
 export async function GET() {
   const token = await getToken();
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const res = await backendFetch('/api/v1/users', token);
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+  try {
+    const res = await backendFetch('/api/v1/users', token);
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : [];
+    return NextResponse.json(data, { status: res.status });
+  } catch (err) {
+    console.error('[admin/users GET]', err);
+    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
   const token = await getToken();
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const body = await request.json();
-  const res = await backendFetch('/api/v1/users', token, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  console.log('[admin/users POST] status', res.status, text);
-  const data = text ? JSON.parse(text) : {};
-  return NextResponse.json(data, { status: res.status });
+  try {
+    const body = await request.json();
+    const res = await backendFetch('/api/v1/users', token, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    console.log('[admin/users POST] status', res.status, text.slice(0, 200));
+    const data = text ? JSON.parse(text) : {};
+    return NextResponse.json(data, { status: res.status });
+  } catch (err) {
+    console.error('[admin/users POST]', err);
+    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+  }
 }
