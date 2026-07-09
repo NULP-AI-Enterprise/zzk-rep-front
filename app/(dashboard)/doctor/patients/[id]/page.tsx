@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { AssessmentPoint } from '@/components/Pro2Chart';
 import { pro2Severity } from '@/lib/pro2';
 import Pro2ChartWrapper from '@/components/Pro2ChartWrapper';
+import StatusAction from '@/components/StatusAction';
 
 type TreatmentOut = { id: number; drug: string; other_drug_name: string | null };
 type ClinicalRecordOut = {
@@ -88,10 +89,19 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
           </span>
         )}
         {session.role === 'DOCTOR' && (
-          <Link href={`/doctor/patients/${id}/clinical/new`}
-            className="bg-brand text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-brand-light transition-colors">
-            + Клінічний запис
-          </Link>
+          <>
+            {patient.status === 'ATTACHED' && (
+              <StatusAction
+                patientId={Number(id)}
+                currentStatus="ATTACHED"
+                selfAttach
+              />
+            )}
+            <Link href={`/doctor/patients/${id}/clinical/new`}
+              className="bg-brand text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-brand-light transition-colors">
+              + Клінічний запис
+            </Link>
+          </>
         )}
       </div>
 

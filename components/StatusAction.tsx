@@ -10,10 +10,13 @@ export default function StatusAction({
   patientId,
   currentStatus = 'PENDING',
   suggestedDoctorId,
+  selfAttach = false,
 }: {
   patientId: number;
   currentStatus?: Status;
   suggestedDoctorId?: number;
+  /** Лікар прикріплює себе — не показувати вибір лікаря, doctor_id не надсилати */
+  selfAttach?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen]       = useState(false);
@@ -45,7 +48,7 @@ export default function StatusAction({
   }, [open]);
 
   const handleSubmit = async () => {
-    if (newStatus === 'ATTACHED' && !doctorId) {
+    if (newStatus === 'ATTACHED' && !selfAttach && !doctorId) {
       setError('Оберіть лікаря');
       return;
     }
@@ -53,7 +56,7 @@ export default function StatusAction({
     setError('');
 
     const body: { status: string; doctor_id?: number } = { status: newStatus };
-    if (newStatus === 'ATTACHED') body.doctor_id = Number(doctorId);
+    if (newStatus === 'ATTACHED' && !selfAttach) body.doctor_id = Number(doctorId);
 
     const res = await fetch(`/api/patients/${patientId}/status`, {
       method: 'PATCH',
@@ -106,7 +109,7 @@ export default function StatusAction({
         <option value="DETACHED">Відкріпити (Відкріплений)</option>
       </select>
 
-      {newStatus === 'ATTACHED' && (
+      {newStatus === 'ATTACHED' && !selfAttach && (
         <select
           value={doctorId}
           onChange={e => setDoctorId(e.target.value)}
@@ -120,6 +123,9 @@ export default function StatusAction({
             </option>
           ))}
         </select>
+      )}
+      {newStatus === 'ATTACHED' && selfAttach && (
+        <p className="text-xs text-gray-500 italic">Пацієнта буде прикріплено до вас</p>
       )}
 
       {error && <p className="text-red-500 text-xs">{error}</p>}

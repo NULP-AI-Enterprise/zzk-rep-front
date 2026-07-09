@@ -78,7 +78,7 @@ export default async function DoctorPending() {
                     </Link>
                   </td>
                   <td className="px-4 md:px-6 py-4">
-                    <StatusAction patientId={p.id} currentStatus="PENDING" />
+                    <StatusAction patientId={p.id} currentStatus="PENDING" selfAttach />
                   </td>
                 </tr>
               ))}
