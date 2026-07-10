@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: zzk-front
-          image: ghcr.io/nulp-ai-enterprise/zzk-rep-front:sha-35a5220
+          image: ghcr.io/nulp-ai-enterprise/zzk-rep-front:sha-963b9ea
           imagePullPolicy: Always
           ports:
             - name: http
