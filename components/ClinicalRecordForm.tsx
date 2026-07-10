@@ -4,7 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Diagnosis = 'UC' | 'CD' | 'UNCLASSIFIED';
+type LabRow = { value: string; date: string };
+type SurgeryRow = { date: string };
 
+// ── Label lists ───────────────────────────────────────────────────────────────
 const DRUGS = [
   { value: '5ASA',              label: '5-АСА' },
   { value: 'BUDESONIDE',        label: 'Будесонід' },
@@ -19,33 +22,43 @@ const DRUGS = [
   { value: 'OTHER',             label: 'Інше' },
 ];
 
-const CD_COMPLICATIONS = [
-  { value: 'arthralgia',       label: 'Артралгії' },
-  { value: 'uveitis',          label: 'Увеїт' },
-  { value: 'erythema_nodosum', label: 'Вузлувата еритема' },
-  { value: 'aphthous_ulcers',  label: 'Афтозні виразки' },
-  { value: 'pyoderma',         label: 'Піодермія гангренозна' },
-  { value: 'anal_fissure',     label: 'Анальна тріщина' },
-  { value: 'new_fistula',      label: 'Новий свищ' },
-  { value: 'abscess',          label: 'Абсцес' },
+const RESISTANT_DRUGS = [
+  { value: 'INFLIXIMAB',   label: 'Інфліксимаб' },
+  { value: 'ADALIMUMAB',   label: 'Адалімумаб' },
+  { value: 'VEDOLIZUMAB',  label: 'Ведолізумаб' },
+  { value: 'USTEKINUMAB',  label: 'Устекінумаб' },
+  { value: 'TOFACITINIB',  label: 'Тофацитиніб' },
+  { value: 'UPADACITINIB', label: 'Упадацитиніб' },
+  { value: 'OTHER',        label: 'Інше' },
 ];
 
-type LabRow = { value: string; date: string };
+// Values match backend CdComplicationType enum (UPPERCASE)
+const CD_COMPLICATIONS = [
+  { value: 'ARTHRALGIA',       label: 'Артралгія' },
+  { value: 'UVEITIS',          label: 'Увеїт' },
+  { value: 'ERYTHEMA_NODOSUM', label: 'Вузлувата еритема' },
+  { value: 'APHTHOUS_ULCERS',  label: 'Афтозні виразки' },
+  { value: 'PYODERMA',         label: 'Піодермія гангренозна' },
+  { value: 'ANAL_FISSURE',     label: 'Анальна тріщина' },
+  { value: 'NEW_FISTULA',      label: 'Нова нориця' },
+  { value: 'ABSCESS',          label: 'Абсцес' },
+];
 
-function scoreSeverityUC(score: number) {
-  if (score <= 1) return { label: 'Ремісія',  cls: 'bg-green-50 text-green-700' };
-  if (score <= 4) return { label: 'Легка',    cls: 'bg-yellow-50 text-yellow-700' };
-  if (score <= 7) return { label: 'Помірна',  cls: 'bg-orange-50 text-orange-700' };
-  return                 { label: 'Тяжка',    cls: 'bg-red-50 text-red-700' };
+// ── Score helpers ─────────────────────────────────────────────────────────────
+function ucSeverity(score: number) {
+  if (score <= 1) return { label: 'Ремісія', cls: 'bg-green-50 text-green-700' };
+  if (score <= 4) return { label: 'Легка',   cls: 'bg-yellow-50 text-yellow-700' };
+  if (score <= 7) return { label: 'Помірна', cls: 'bg-orange-50 text-orange-700' };
+  return               { label: 'Тяжка',   cls: 'bg-red-50 text-red-700' };
+}
+function cdSeverity(score: number) {
+  if (score <  5) return { label: 'Ремісія', cls: 'bg-green-50 text-green-700' };
+  if (score <= 7) return { label: 'Легка',   cls: 'bg-yellow-50 text-yellow-700' };
+  if (score <= 16)return { label: 'Помірна', cls: 'bg-orange-50 text-orange-700' };
+  return               { label: 'Тяжка',   cls: 'bg-red-50 text-red-700' };
 }
 
-function scoreSeverityCD(score: number) {
-  if (score <  5) return { label: 'Ремісія',  cls: 'bg-green-50 text-green-700' };
-  if (score <= 7) return { label: 'Легка',    cls: 'bg-yellow-50 text-yellow-700' };
-  if (score <= 16)return { label: 'Помірна',  cls: 'bg-orange-50 text-orange-700' };
-  return                 { label: 'Тяжка',    cls: 'bg-red-50 text-red-700' };
-}
-
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function ClinicalRecordForm({
   patientId,
   diagnosis,
@@ -55,64 +68,66 @@ export default function ClinicalRecordForm({
 }) {
   const router = useRouter();
   const isCD = diagnosis === 'CD';
+  const isUC = diagnosis === 'UC';
 
-  // ── UC fields ──────────────────────────────────────────────
+  // ── UC-specific fields (map to UcRecordCreate) ────────────────────────────
+  const [ucExtent,           setUcExtent]          = useState('');
   const [ucStoolFreq,        setUcStoolFreq]        = useState(0);
-  const [ucBlood,            setUcBlood]            = useState(0);
-  const [ucPhysicianGlobal,  setUcPhysicianGlobal]  = useState(0);
-  const [ucMayoEndoscopic,   setUcMayoEndoscopic]   = useState<string>('');
+  const [ucRectalBleeding,   setUcRectalBleeding]   = useState(0);
+  const [ucPhysician,        setUcPhysician]        = useState(0);
+  const [ucEndoMayo,         setUcEndoMayo]         = useState('');
+  const [ucEndoMayoOther,    setUcEndoMayoOther]    = useState('');
+  const [ucComments,         setUcComments]         = useState('');
 
-  // ── CD fields ──────────────────────────────────────────────
-  const [cdWellbeing,   setCdWellbeing]   = useState(0);
-  const [cdPain,        setCdPain]        = useState(0);
-  const [cdStool,       setCdStool]       = useState(0);
-  const [cdMass,        setCdMass]        = useState(0);
-  const [cdComplics,    setCdComplics]    = useState<string[]>([]);
-  const [cdLocalize,    setCdLocalize]    = useState('');
-  const [cdBehavior,    setCdBehavior]    = useState('');
-  const [cdPerianal,    setCdPerianal]    = useState('');
-  const [cdSESCD,       setCdSESCD]       = useState('');
+  // ── CD-specific fields (map to CdRecordCreate) ────────────────────────────
+  const [cdLocalization, setCdLocalization] = useState('');
+  const [cdBehavior,     setCdBehavior]     = useState('');
+  const [cdPerianal,     setCdPerianal]     = useState('');          // 'YES'|'NO'|''
+  const [cdWellbeing,    setCdWellbeing]    = useState(0);           // general_wellbeing
+  const [cdPain,         setCdPain]         = useState(0);           // abdominal_pain
+  const [cdStool,        setCdStool]        = useState(0);           // stool_count
+  const [cdMass,         setCdMass]         = useState(0);           // abdominal_mass
+  const [cdSESCD,        setCdSESCD]        = useState('');          // ses_cd
+  const [cdSESOther,     setCdSESOther]     = useState('');
+  const [cdComplics,     setCdComplics]     = useState<string[]>([]);
+  const [cdComments,     setCdComments]     = useState('');
 
-  // ── Common ─────────────────────────────────────────────────
-  const [treatments,    setTreatments]    = useState<string[]>([]);
-  const [otherDrug,     setOtherDrug]     = useState('');
-  const [strictures,    setStrictures]    = useState(false);
-  const [steroidDep,    setSteroidDep]    = useState(false);
-  const [steroidRes,    setSteroidRes]    = useState(false);
-  const [smoking,       setSmoking]       = useState('');
-  const [crpRows,       setCrpRows]       = useState<LabRow[]>([{ value: '', date: '' }]);
-  const [calpRows,      setCalpRows]      = useState<LabRow[]>([{ value: '', date: '' }]);
+  // ── Common clinical fields (map to ClinicalRecordCreate) ──────────────────
+  const [treatments,           setTreatments]          = useState<string[]>([]);
+  const [otherDrugName,        setOtherDrugName]       = useState('');
+  const [resistantDrugs,       setResistantDrugs]      = useState<string[]>([]);
+  const [resistantDrugsOther,  setResistantDrugsOther] = useState('');
+  const [strictures,           setStrictures]          = useState<boolean | null>(null);
+  const [penetrationsFistulas, setPenetrationsFistulas]= useState<boolean | null>(null);
+  const [fecalIncontinence,    setFecalIncontinence]   = useState('');
+  const [infectiousComplics,   setInfectiousComplics]  = useState('');
+  const [abdominalSurgeries,   setAbdominalSurgeries]  = useState<boolean | null>(null);
+  const [steroidDep,           setSteroidDep]          = useState<boolean | null>(null);
+  const [steroidRes,           setSteroidRes]          = useState<boolean | null>(null);
+  const [advTherapyRes,        setAdvTherapyRes]       = useState<boolean | null>(null);
+  const [smoking,              setSmoking]             = useState('');
+  const [sideEffects,          setSideEffects]         = useState('');
+  const [surgeries,            setSurgeries]           = useState<SurgeryRow[]>([]);
+  const [crpRows,              setCrpRows]             = useState<LabRow[]>([{ value: '', date: '' }]);
+  const [calpRows,             setCalpRows]            = useState<LabRow[]>([{ value: '', date: '' }]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Live scores
-  const ucScore = ucStoolFreq + ucBlood + ucPhysicianGlobal;
+  // Live score
+  const ucScore = ucStoolFreq + ucRectalBleeding + ucPhysician;
   const cdScore = cdWellbeing + cdPain + cdStool + cdMass + cdComplics.length;
-  const ucSev   = scoreSeverityUC(ucScore);
-  const cdSev   = scoreSeverityCD(cdScore);
 
-  function toggleComplication(val: string) {
-    setCdComplics(prev =>
-      prev.includes(val) ? prev.filter(c => c !== val) : [...prev, val],
-    );
-  }
-
-  function toggleDrug(val: string) {
-    setTreatments(prev =>
-      prev.includes(val) ? prev.filter(d => d !== val) : [...prev, val],
-    );
+  function toggleList(list: string[], setList: (v: string[]) => void, val: string) {
+    setList(list.includes(val) ? list.filter(v => v !== val) : [...list, val]);
   }
 
   function setLabRow(
-    rows: LabRow[],
-    setRows: (r: LabRow[]) => void,
-    index: number,
-    field: keyof LabRow,
-    value: string,
+    rows: LabRow[], setRows: (r: LabRow[]) => void,
+    i: number, field: keyof LabRow, value: string,
   ) {
     const next = [...rows];
-    next[index] = { ...next[index], [field]: value };
+    next[i] = { ...next[i], [field]: value };
     setRows(next);
   }
 
@@ -121,59 +136,115 @@ export default function ClinicalRecordForm({
     setSubmitting(true);
     setError('');
 
+    // Build lab_results in backend format
+    const labResults = [
+      ...crpRows.filter(r => r.value && r.date).map(r => ({
+        lab_type: 'CRP', value: Number(r.value), result_date: r.date,
+      })),
+      ...calpRows.filter(r => r.value && r.date).map(r => ({
+        lab_type: 'CALPROTECTIN', value: Number(r.value), result_date: r.date,
+      })),
+    ];
+
+    // Build surgeries list
+    const surgeriesList = surgeries.filter(s => s.date).map(s => ({ operation_date: s.date }));
+
+    // Build treatments list
     const treatmentsList = treatments.map(drug => ({
       drug,
-      other_drug_name: drug === 'OTHER' ? otherDrug || null : null,
+      other_drug_name: drug === 'OTHER' ? (otherDrugName || null) : null,
     }));
 
-    const labFilter = (rows: LabRow[]) =>
-      rows.filter(r => r.value !== '' && r.date !== '').map(r => ({
-        value: Number(r.value),
-        date: r.date,
-      }));
+    // Build resistant drugs list
+    const resistantList = resistantDrugs.map(drug => ({
+      drug,
+      other_drug_name: drug === 'OTHER' ? (resistantDrugsOther || null) : null,
+    }));
 
-    const body: Record<string, unknown> = {
+    // ── Payload 1: /records/clinical ──────────────────────────────────────
+    const clinicalBody: Record<string, unknown> = {
       treatments: treatmentsList,
+      resistant_drugs: resistantList,
+      lab_results: labResults,
+      surgeries: surgeriesList,
       strictures,
+      penetrations_fistulas: penetrationsFistulas,
+      abdominal_surgeries: abdominalSurgeries,
       steroid_dependence: steroidDep,
       steroid_resistance: steroidRes,
+      advanced_therapy_resistance: advTherapyRes,
       smoking_status: smoking || null,
-      crp_values: labFilter(crpRows),
-      calprotectin_values: labFilter(calpRows),
     };
+    if (fecalIncontinence)   clinicalBody.fecal_incontinence        = fecalIncontinence;
+    if (infectiousComplics)  clinicalBody.infectious_complications   = infectiousComplics;
+    if (sideEffects)         clinicalBody.side_effects               = sideEffects;
+    if (resistantDrugsOther) clinicalBody.resistant_drugs_other      = resistantDrugsOther;
+
+    // ── Payload 2: /records/cd or /records/uc ─────────────────────────────
+    let diseaseBody: Record<string, unknown> | null = null;
 
     if (isCD) {
-      body.cd_general_wellbeing = cdWellbeing;
-      body.cd_abdominal_pain    = cdPain;
-      body.cd_stool_count       = cdStool;
-      body.cd_palpable_mass     = cdMass;
-      body.cd_complications     = cdComplics;
-      body.cd_hbi_score         = cdScore;
-      if (cdLocalize) body.cd_localization = cdLocalize;
-      if (cdBehavior) body.cd_behavior     = cdBehavior;
-      if (cdPerianal) body.cd_perianal     = cdPerianal === 'YES';
-      if (cdSESCD)    body.cd_sescd        = cdSESCD;
-    } else {
-      body.uc_stool_frequency      = ucStoolFreq;
-      body.uc_blood_in_stool       = ucBlood;
-      body.uc_physician_global     = ucPhysicianGlobal;
-      body.uc_partial_mayo_score   = ucScore;
-      if (ucMayoEndoscopic) body.mayo_endoscopic_score = Number(ucMayoEndoscopic);
+      diseaseBody = {
+        general_wellbeing: cdWellbeing,
+        abdominal_pain:    cdPain,
+        stool_count:       cdStool,
+        abdominal_mass:    cdMass,
+        complications:     cdComplics,
+      };
+      if (cdLocalization) diseaseBody.localization    = cdLocalization;
+      if (cdBehavior)     diseaseBody.behavior        = cdBehavior;
+      if (cdPerianal)     diseaseBody.perianal_lesions = cdPerianal === 'YES';
+      if (cdSESCD)        diseaseBody.ses_cd          = cdSESCD;
+      if (cdSESOther)     diseaseBody.ses_cd_other    = cdSESOther;
+      if (cdComments)     diseaseBody.comments        = cdComments;
+    } else if (isUC) {
+      diseaseBody = {
+        stool_frequency:      ucStoolFreq,
+        rectal_bleeding:      ucRectalBleeding,
+        physician_assessment: ucPhysician,
+      };
+      if (ucExtent)       diseaseBody.extent              = ucExtent;
+      if (ucEndoMayo)     diseaseBody.endoscopic_mayo     = Number(ucEndoMayo);
+      if (ucEndoMayoOther)diseaseBody.endoscopic_mayo_other = ucEndoMayoOther;
+      if (ucComments)     diseaseBody.comments            = ucComments;
     }
 
     try {
-      const res = await fetch(`/api/patients/${patientId}/clinical`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(
-          Array.isArray(data.detail)
-            ? data.detail.map((d: { msg: string }) => d.msg).join('; ')
-            : (data.detail ?? data.error ?? 'Помилка збереження'),
+      // Send both requests in parallel
+      const requests: Promise<Response>[] = [
+        fetch(`/api/patients/${patientId}/clinical`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(clinicalBody),
+        }),
+      ];
+
+      const diseaseEndpoint = isCD ? 'cd' : isUC ? 'uc' : null;
+      if (diseaseEndpoint && diseaseBody) {
+        requests.push(
+          fetch(`/api/patients/${patientId}/${diseaseEndpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(diseaseBody),
+          }),
         );
+      }
+
+      const responses = await Promise.all(requests);
+      const errors: string[] = [];
+
+      for (const res of responses) {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const msg = Array.isArray(data.detail)
+            ? data.detail.map((d: { msg: string }) => d.msg).join('; ')
+            : (data.detail ?? data.error ?? `Помилка (${res.status})`);
+          errors.push(msg);
+        }
+      }
+
+      if (errors.length > 0) {
+        setError(errors.join(' | '));
       } else {
         router.push(`/doctor/patients/${patientId}`);
         router.refresh();
@@ -185,130 +256,99 @@ export default function ClinicalRecordForm({
     }
   }
 
+  const sev = isCD ? cdSeverity(cdScore) : ucSeverity(ucScore);
+  const score = isCD ? cdScore : ucScore;
+  const scoreLabel = isCD ? 'HBI (Harvey-Bradshaw)' : 'Partial Mayo';
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8 max-w-3xl mx-auto">
 
-      {/* ── Score banner ─────────────────────────────────────── */}
-      <div className={`flex items-center justify-between p-5 rounded-2xl border ${isCD ? cdSev.cls : ucSev.cls}`}>
+      {/* ── Score banner ─────────────────────────────────────────── */}
+      <div className={`flex items-center justify-between p-5 rounded-2xl border ${sev.cls}`}>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide opacity-70 mb-0.5">
-            {isCD ? 'HBI (Харві-Бредшоу)' : 'Частковий Mayo'}
-          </p>
-          <p className="text-3xl font-bold">{isCD ? cdScore : ucScore}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-70 mb-0.5">{scoreLabel}</p>
+          <p className="text-3xl font-bold">{score}</p>
         </div>
-        <span className={`px-4 py-2 rounded-full text-sm font-bold border border-current/20 ${isCD ? cdSev.cls : ucSev.cls}`}>
-          {isCD ? cdSev.label : ucSev.label}
+        <span className={`px-4 py-2 rounded-full text-sm font-bold border border-current/20 ${sev.cls}`}>
+          {sev.label}
         </span>
       </div>
 
-      {/* ── UC fields ────────────────────────────────────────── */}
-      {!isCD && (
-        <Card title="Оцінка лікаря (ВК) — Doc_Score_BK">
-          <ScaleRow label="Частота стільця" max={3} value={ucStoolFreq} onChange={setUcStoolFreq}
-            hint="0 — норма, 1 — 1-2 рази/добу, 2 — 3-4 рази/добу, 3 — ≥5 разів/добу" />
-          <ScaleRow label="Кров у стільці" max={3} value={ucBlood} onChange={setUcBlood}
-            hint="0 — немає, 1 — сліди, 2 — явна кров, 3 — переважно кров" />
-          <ScaleRow label="Глобальна оцінка лікаря" max={3} value={ucPhysicianGlobal} onChange={setUcPhysicianGlobal}
-            hint="0 — норма, 1 — легке, 2 — помірне, 3 — тяжке" />
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-              Ендоскопічний Mayo (Mayo Endoscopic Score)
-            </label>
-            <select
-              value={ucMayoEndoscopic}
-              onChange={e => setUcMayoEndoscopic(e.target.value)}
-              className="field"
-            >
-              <option value="">— не визначено —</option>
-              <option value="0">0 — Норма/неактивне</option>
-              <option value="1">1 — Легке (еритема, втрата судинного малюнку)</option>
-              <option value="2">2 — Помірне (виражена еритема, ерозії)</option>
-              <option value="3">3 — Тяжке (спонтанна кровоточивість, виразки)</option>
-            </select>
-          </div>
-        </Card>
-      )}
-
-      {/* ── CD fields ────────────────────────────────────────── */}
-      {isCD && (
+      {/* ── UC specific ──────────────────────────────────────────── */}
+      {isUC && (
         <>
-          <Card title="Оцінка лікаря (ХК) — HBI (Harvey-Bradshaw Index)">
-            <ScaleRow label="Загальне самопочуття" max={4} value={cdWellbeing} onChange={setCdWellbeing}
-              hint="0 — чудово, 1 — добре, 2 — задовільно, 3 — погано, 4 — дуже погано" />
-            <ScaleRow label="Абдомінальний біль" max={3} value={cdPain} onChange={setCdPain}
-              hint="0 — немає, 1 — легкий, 2 — помірний, 3 — сильний" />
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-                Кількість рідких випорожнень на добу
-              </label>
-              <input
-                type="number" min="0" max="30" value={cdStool}
-                onChange={e => setCdStool(Math.max(0, Math.min(30, Number(e.target.value))))}
-                className="field w-32"
-              />
-            </div>
-            <ScaleRow label="Абдомінальна маса" max={3} value={cdMass} onChange={setCdMass}
-              hint="0 — немає, 1 — сумнівна, 2 — визначається, 3 — болюча" />
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">
-                Ускладнення <span className="normal-case font-normal text-gray-300">(1 бал за кожне)</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {CD_COMPLICATIONS.map(c => (
-                  <label key={c.value} className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
-                    cdComplics.includes(c.value)
-                      ? 'border-brand bg-brand/5 text-brand'
-                      : 'border-gray-200 hover:border-brand/40'
-                  }`}>
-                    <input type="checkbox" className="sr-only"
-                      checked={cdComplics.includes(c.value)}
-                      onChange={() => toggleComplication(c.value)} />
-                    <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
-                      cdComplics.includes(c.value) ? 'bg-brand border-brand' : 'border-gray-300'
-                    }`}>
-                      {cdComplics.includes(c.value) && (
-                        <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M1 4l3 3 5-6" />
-                        </svg>
-                      )}
-                    </span>
-                    <span className="text-sm">{c.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+          <Card title="Поширеність (Монреальська класифікація)">
+            <RadioGroup
+              label="Поширеність ВК"
+              value={ucExtent}
+              onChange={setUcExtent}
+              options={[
+                { value: 'E1', label: 'E1 — Проктит (до rectosigmoid junction)' },
+                { value: 'E2', label: 'E2 — Лівостороння (до lienalis flexure)' },
+                { value: 'E3', label: 'E3 — Тотальна (паноколіт)' },
+              ]}
+            />
           </Card>
 
-          <Card title="Класифікація ХК (Montreal)">
-            <div className="grid grid-cols-2 gap-6">
+          <Card title="Оцінка лікаря (ВК) — Partial Mayo">
+            <ScaleRow label="Частота стільця" max={3} value={ucStoolFreq} onChange={setUcStoolFreq}
+              hint="0 — норма, 1 — 1-2 рази/добу вище норми, 2 — 3-4 рази/добу, 3 — ≥5 разів/добу" />
+            <ScaleRow label="Ректальна кровотеча" max={3} value={ucRectalBleeding} onChange={setUcRectalBleeding}
+              hint="0 — немає, 1 — сліди крові &lt; 50% часу, 2 — явна кров ≥ 50% часу, 3 — тільки кров" />
+            <ScaleRow label="Глобальна оцінка лікаря" max={3} value={ucPhysician} onChange={setUcPhysician}
+              hint="0 — норма, 1 — легке, 2 — помірне, 3 — тяжке захворювання" />
+            <div>
+              <label className="field-label">Ендоскопічна Mayo (необов'язково)</label>
+              <select value={ucEndoMayo} onChange={e => setUcEndoMayo(e.target.value)} className="field">
+                <option value="">— не визначено —</option>
+                <option value="0">0 — Норма / неактивне</option>
+                <option value="1">1 — Легке (еритема, втрата судинного малюнку)</option>
+                <option value="2">2 — Помірне (виражена еритема, ерозії)</option>
+                <option value="3">3 — Тяжке (спонтанна кровоточивість, виразки)</option>
+              </select>
+            </div>
+            {ucEndoMayo && (
               <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-                  Локалізація
-                </label>
-                <select value={cdLocalize} onChange={e => setCdLocalize(e.target.value)} className="field">
+                <label className="field-label">Опис ендоскопії (необов'язково)</label>
+                <input type="text" value={ucEndoMayoOther} onChange={e => setUcEndoMayoOther(e.target.value)}
+                  className="field" placeholder="Додаткові деталі" />
+              </div>
+            )}
+            <div>
+              <label className="field-label">Коментар лікаря (необов'язково)</label>
+              <textarea value={ucComments} onChange={e => setUcComments(e.target.value)}
+                className="field min-h-[80px] resize-y" placeholder="Клінічні нотатки" />
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* ── CD specific ──────────────────────────────────────────── */}
+      {isCD && (
+        <>
+          <Card title="Класифікація ХК (Монреальська)">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <label className="field-label">Локалізація</label>
+                <select value={cdLocalization} onChange={e => setCdLocalization(e.target.value)} className="field">
                   <option value="">— оберіть —</option>
-                  <option value="L1">L1 — Термінальний клубовий</option>
-                  <option value="L2">L2 — Товстий кишечник</option>
-                  <option value="L3">L3 — Ілеоколіт</option>
-                  <option value="L4">L4 — Верхній ШКТ</option>
+                  <option value="L1">L1 — Клубова кишка</option>
+                  <option value="L2">L2 — Товста кишка</option>
+                  <option value="L3">L3 — Клубово-товстокишкова</option>
+                  <option value="L4">L4 — Верхні відділи ШКТ</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-                  Поведінка хвороби
-                </label>
+                <label className="field-label">Поведінка хвороби</label>
                 <select value={cdBehavior} onChange={e => setCdBehavior(e.target.value)} className="field">
                   <option value="">— оберіть —</option>
-                  <option value="B1">B1 — Запальна (незвужуюча, непроникаюча)</option>
-                  <option value="B2">B2 — Стриктуруюча</option>
-                  <option value="B3">B3 — Проникаюча</option>
+                  <option value="B1">B1 — Запальна (незвужуюча)</option>
+                  <option value="B2">B2 — Стриктурувальна</option>
+                  <option value="B3">B3 — Пенетрувальна</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-                  Періанальне ураження
-                </label>
+                <label className="field-label">Періанальне ураження</label>
                 <select value={cdPerianal} onChange={e => setCdPerianal(e.target.value)} className="field">
                   <option value="">— оберіть —</option>
                   <option value="YES">Так</option>
@@ -316,65 +356,100 @@ export default function ClinicalRecordForm({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-                  SES-CD ендоскопія
-                </label>
+                <label className="field-label">SES-CD (ендоскопія)</label>
                 <select value={cdSESCD} onChange={e => setCdSESCD(e.target.value)} className="field">
                   <option value="">— не визначено —</option>
-                  <option value="0-2">0-2 (ремісія)</option>
-                  <option value="3-6">3-6 (легка)</option>
-                  <option value="7-15">7-15 (помірна)</option>
+                  <option value="0-2">0–2 (ремісія)</option>
+                  <option value="3-6">3–6 (легка)</option>
+                  <option value="7-15">7–15 (помірна)</option>
                   <option value=">15">&gt;15 (тяжка)</option>
                 </select>
               </div>
+            </div>
+            {cdSESCD && (
+              <div>
+                <label className="field-label">Опис ендоскопії SES-CD (необов'язково)</label>
+                <input type="text" value={cdSESOther} onChange={e => setCdSESOther(e.target.value)}
+                  className="field" placeholder="Деталі ендоскопічного дослідження" />
+              </div>
+            )}
+          </Card>
+
+          <Card title="Оцінка лікаря (ХК) — HBI (Harvey-Bradshaw Index)">
+            <ScaleRow label="Загальне самопочуття" max={4} value={cdWellbeing} onChange={setCdWellbeing}
+              hint="0 — чудово, 1 — добре, 2 — задовільно, 3 — погано, 4 — дуже погано" />
+            <ScaleRow label="Абдомінальний біль" max={3} value={cdPain} onChange={setCdPain}
+              hint="0 — немає, 1 — легкий, 2 — помірний, 3 — сильний" />
+            <div>
+              <label className="field-label">Кількість рідких випорожнень на добу</label>
+              <input type="number" min="0" max="30" value={cdStool}
+                onChange={e => setCdStool(Math.max(0, Math.min(30, Number(e.target.value))))}
+                className="field w-32" />
+            </div>
+            <ScaleRow label="Абдомінальна маса" max={3} value={cdMass} onChange={setCdMass}
+              hint="0 — немає, 1 — сумнівна, 2 — визначається, 3 — болюча" />
+
+            <div>
+              <label className="field-label">Позакишкові ускладнення <span className="normal-case font-normal text-gray-400">(1 бал за кожне)</span></label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {CD_COMPLICATIONS.map(c => (
+                  <CheckChip key={c.value} label={c.label}
+                    checked={cdComplics.includes(c.value)}
+                    onChange={() => toggleList(cdComplics, setCdComplics, c.value)} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="field-label">Коментар лікаря (необов'язково)</label>
+              <textarea value={cdComments} onChange={e => setCdComments(e.target.value)}
+                className="field min-h-[80px] resize-y" placeholder="Клінічні нотатки" />
             </div>
           </Card>
         </>
       )}
 
-      {/* ── Therapy ─────────────────────────────────────────── */}
+      {/* ── Therapy ──────────────────────────────────────────────── */}
       <Card title="Терапія">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {DRUGS.map(d => (
-            <label key={d.value} className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
-              treatments.includes(d.value)
-                ? 'border-brand bg-brand/5 text-brand'
-                : 'border-gray-200 hover:border-brand/40'
-            }`}>
-              <input type="checkbox" className="sr-only"
+        <div>
+          <label className="field-label">Поточні препарати</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            {DRUGS.map(d => (
+              <CheckChip key={d.value} label={d.label}
                 checked={treatments.includes(d.value)}
-                onChange={() => toggleDrug(d.value)} />
-              <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
-                treatments.includes(d.value) ? 'bg-brand border-brand' : 'border-gray-300'
-              }`}>
-                {treatments.includes(d.value) && (
-                  <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M1 4l3 3 5-6" />
-                  </svg>
-                )}
-              </span>
-              <span className="text-sm">{d.label}</span>
-            </label>
-          ))}
-        </div>
-        {treatments.includes('OTHER') && (
-          <div className="mt-4">
-            <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-              Назва препарату (інше)
-            </label>
-            <input type="text" value={otherDrug} onChange={e => setOtherDrug(e.target.value)}
-              placeholder="Назва препарату" className="field" />
+                onChange={() => toggleList(treatments, setTreatments, d.value)} />
+            ))}
           </div>
-        )}
-        <div className="mt-4 grid grid-cols-3 gap-4">
-          <Toggle label="Стероїдозалежність" value={steroidDep} onChange={setSteroidDep} />
-          <Toggle label="Стероїдорезистентність" value={steroidRes} onChange={setSteroidRes} />
-          <Toggle label="Стриктури" value={strictures} onChange={setStrictures} />
+          {treatments.includes('OTHER') && (
+            <div className="mt-3">
+              <label className="field-label">Назва препарату (інше)</label>
+              <input type="text" value={otherDrugName} onChange={e => setOtherDrugName(e.target.value)}
+                placeholder="Назва препарату" className="field" />
+            </div>
+          )}
         </div>
-        <div className="mt-4">
-          <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
-            Статус куріння
-          </label>
+
+        <div>
+          <label className="field-label">Резистентність до препаратів</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            {RESISTANT_DRUGS.map(d => (
+              <CheckChip key={d.value} label={d.label}
+                checked={resistantDrugs.includes(d.value)}
+                onChange={() => toggleList(resistantDrugs, setResistantDrugs, d.value)}
+                danger />
+            ))}
+          </div>
+          {resistantDrugs.includes('OTHER') && (
+            <div className="mt-3">
+              <label className="field-label">Назва препарату (резистентність, інше)</label>
+              <input type="text" value={resistantDrugsOther} onChange={e => setResistantDrugsOther(e.target.value)}
+                placeholder="Назва" className="field" />
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="field-label">Статус куріння</label>
           <select value={smoking} onChange={e => setSmoking(e.target.value)} className="field w-64">
             <option value="">— оберіть —</option>
             <option value="NEVER">Ніколи не курив</option>
@@ -384,16 +459,68 @@ export default function ClinicalRecordForm({
         </div>
       </Card>
 
-      {/* ── Lab values ──────────────────────────────────────── */}
+      {/* ── Complications & complications ─────────────────────────── */}
+      <Card title="Ускладнення та супутні стани">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+          <BoolSelect label="Стриктури" value={strictures} onChange={setStrictures} />
+          <BoolSelect label="Пенетрації / нориці" value={penetrationsFistulas} onChange={setPenetrationsFistulas} />
+          <BoolSelect label="Операції в анамнезі" value={abdominalSurgeries} onChange={setAbdominalSurgeries} />
+          <BoolSelect label="Стероїдозалежність" value={steroidDep} onChange={setSteroidDep} />
+          <BoolSelect label="Стероїдорезистентність" value={steroidRes} onChange={setSteroidRes} />
+          <BoolSelect label="Резистентність до біол. терапії" value={advTherapyRes} onChange={setAdvTherapyRes} />
+        </div>
+
+        <div>
+          <label className="field-label">Нетримання калу (опис, необов'язково)</label>
+          <input type="text" value={fecalIncontinence} onChange={e => setFecalIncontinence(e.target.value)}
+            className="field" placeholder="Деталі, якщо є" />
+        </div>
+        <div>
+          <label className="field-label">Інфекційні ускладнення (опис, необов'язково)</label>
+          <input type="text" value={infectiousComplics} onChange={e => setInfectiousComplics(e.target.value)}
+            className="field" placeholder="Деталі, якщо є" />
+        </div>
+        <div>
+          <label className="field-label">Побічні ефекти терапії (необов'язково)</label>
+          <input type="text" value={sideEffects} onChange={e => setSideEffects(e.target.value)}
+            className="field" placeholder="Опис побічних ефектів" />
+        </div>
+      </Card>
+
+      {/* ── Surgeries ─────────────────────────────────────────────── */}
+      <Card title="Хірургічні втручання">
+        <div className="space-y-3">
+          {surgeries.map((s, i) => (
+            <div key={i} className="flex gap-3 items-center">
+              <span className="text-sm text-gray-500 w-24 shrink-0">Дата операції</span>
+              <input type="date" value={s.date}
+                onChange={e => {
+                  const next = [...surgeries];
+                  next[i] = { date: e.target.value };
+                  setSurgeries(next);
+                }}
+                className="field flex-1" />
+              <button type="button"
+                onClick={() => setSurgeries(surgeries.filter((_, j) => j !== i))}
+                className="text-gray-300 hover:text-red-400 transition-colors text-xl leading-none">×</button>
+            </div>
+          ))}
+          <button type="button"
+            onClick={() => setSurgeries([...surgeries, { date: '' }])}
+            className="text-sm text-brand hover:underline">
+            + Додати операцію
+          </button>
+        </div>
+      </Card>
+
+      {/* ── Lab values ────────────────────────────────────────────── */}
       <Card title="Лабораторні показники">
-        <LabSection label="СРБ (мг/л)" rows={crpRows} setRows={setCrpRows} setRow={setLabRow} />
-        <LabSection label="Кальпротектин (мкг/г)" rows={calpRows} setRows={setCalpRows} setRow={setLabRow} />
+        <LabSection label="СРБ (мг/л) — норма < 5" rows={crpRows} setRows={setCrpRows} setRow={setLabRow} />
+        <LabSection label="Кальпротектин (мкг/г) — норма < 50" rows={calpRows} setRows={setCalpRows} setRow={setLabRow} />
       </Card>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">{error}</div>
       )}
 
       <div className="flex gap-3 pb-8">
@@ -410,7 +537,7 @@ export default function ClinicalRecordForm({
   );
 }
 
-// ── Sub-components ──────────────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -421,21 +548,17 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function ScaleRow({
-  label, max, value, onChange, hint,
-}: {
+function ScaleRow({ label, max, value, onChange, hint }: {
   label: string; max: number; value: number; onChange: (v: number) => void; hint?: string;
 }) {
   return (
     <div className="space-y-2">
       <label className="block font-medium text-gray-800 text-sm">{label}</label>
-      {hint && <p className="text-xs text-gray-400">{hint}</p>}
+      {hint && <p className="text-xs text-gray-400" dangerouslySetInnerHTML={{ __html: hint }} />}
       <div className="flex gap-2">
         {Array.from({ length: max + 1 }, (_, i) => i).map(v => (
           <label key={v} className={`flex-1 py-2.5 border rounded-xl text-center cursor-pointer transition-colors text-sm font-medium ${
-            value === v
-              ? 'border-brand bg-brand/10 text-brand'
-              : 'border-gray-200 hover:border-brand/40 text-gray-600'
+            value === v ? 'border-brand bg-brand/10 text-brand' : 'border-gray-200 hover:border-brand/40 text-gray-600'
           }`}>
             <input type="radio" className="sr-only" checked={value === v} onChange={() => onChange(v)} />
             {v}
@@ -446,33 +569,85 @@ function ScaleRow({
   );
 }
 
-function Toggle({
-  label, value, onChange,
-}: {
-  label: string; value: boolean; onChange: (v: boolean) => void;
+function RadioGroup({ label, value, onChange, options }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
 }) {
   return (
-    <label className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${
-      value ? 'border-orange-300 bg-orange-50 text-orange-700' : 'border-gray-200 hover:border-gray-300'
+    <div className="space-y-2">
+      <label className="field-label">{label}</label>
+      <div className="space-y-2">
+        {options.map(o => (
+          <label key={o.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+            value === o.value ? 'border-brand bg-brand/5 text-brand' : 'border-gray-200 hover:border-brand/40'
+          }`}>
+            <input type="radio" className="sr-only" checked={value === o.value} onChange={() => onChange(o.value)} />
+            <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+              value === o.value ? 'border-brand' : 'border-gray-300'
+            }`}>
+              {value === o.value && <span className="w-2 h-2 rounded-full bg-brand" />}
+            </span>
+            <span className="text-sm">{o.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CheckChip({ label, checked, onChange, danger = false }: {
+  label: string; checked: boolean; onChange: () => void; danger?: boolean;
+}) {
+  const active = danger
+    ? 'border-red-300 bg-red-50 text-red-700'
+    : 'border-brand bg-brand/5 text-brand';
+  return (
+    <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
+      checked ? active : 'border-gray-200 hover:border-gray-300'
     }`}>
-      <input type="checkbox" className="sr-only" checked={value} onChange={e => onChange(e.target.checked)} />
+      <input type="checkbox" className="sr-only" checked={checked} onChange={onChange} />
       <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
-        value ? 'bg-orange-500 border-orange-500' : 'border-gray-300'
+        checked ? (danger ? 'bg-red-500 border-red-500' : 'bg-brand border-brand') : 'border-gray-300'
       }`}>
-        {value && (
+        {checked && (
           <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M1 4l3 3 5-6" />
           </svg>
         )}
       </span>
-      <span className="text-xs font-medium">{label}</span>
+      <span className="text-sm">{label}</span>
     </label>
   );
 }
 
-function LabSection({
-  label, rows, setRows, setRow,
-}: {
+function BoolSelect({ label, value, onChange }: {
+  label: string; value: boolean | null; onChange: (v: boolean | null) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="field-label">{label}</label>
+      <div className="flex gap-2">
+        {([null, true, false] as const).map((v) => (
+          <button key={String(v)} type="button"
+            onClick={() => onChange(v)}
+            className={`px-4 py-1.5 text-sm rounded-lg border transition-colors ${
+              value === v
+                ? v === true  ? 'bg-orange-100 border-orange-400 text-orange-700 font-medium'
+                : v === false ? 'bg-gray-100 border-gray-400 text-gray-700 font-medium'
+                              : 'bg-gray-50 border-gray-300 text-gray-500'
+                : 'border-gray-200 hover:border-gray-300 text-gray-500'
+            }`}>
+            {v === null ? '—' : v ? 'Так' : 'Ні'}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LabSection({ label, rows, setRows, setRow }: {
   label: string;
   rows: LabRow[];
   setRows: (r: LabRow[]) => void;
@@ -481,12 +656,9 @@ function LabSection({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="block text-xs font-bold uppercase tracking-widest text-gray-400">{label}</label>
-        <button type="button"
-          onClick={() => setRows([...rows, { value: '', date: '' }])}
-          className="text-xs text-brand hover:underline">
-          + додати
-        </button>
+        <label className="field-label">{label}</label>
+        <button type="button" onClick={() => setRows([...rows, { value: '', date: '' }])}
+          className="text-xs text-brand hover:underline">+ додати</button>
       </div>
       {rows.map((row, i) => (
         <div key={i} className="flex gap-3 items-center">
@@ -498,11 +670,8 @@ function LabSection({
             onChange={e => setRow(rows, setRows, i, 'date', e.target.value)}
             className="field flex-1" />
           {rows.length > 1 && (
-            <button type="button"
-              onClick={() => setRows(rows.filter((_, j) => j !== i))}
-              className="text-gray-300 hover:text-red-400 transition-colors text-lg leading-none">
-              ×
-            </button>
+            <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))}
+              className="text-gray-300 hover:text-red-400 transition-colors text-xl leading-none">×</button>
           )}
         </div>
       ))}

@@ -30,6 +30,9 @@ body {
   .field {
     @apply w-full border-b border-black/50 bg-transparent py-2 outline-none focus:border-brand transition-colors;
   }
+  .field-label {
+    @apply block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2;
+  }
 }
 
 @layer utilities {
