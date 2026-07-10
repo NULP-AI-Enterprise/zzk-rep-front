@@ -7,6 +7,29 @@ type Diagnosis = 'UC' | 'CD' | 'UNCLASSIFIED';
 type LabRow = { value: string; date: string };
 type SurgeryRow = { date: string };
 
+type InitialClinical = {
+  treatments: { drug: string; other_drug_name: string | null }[];
+  resistant_drugs: { drug: string; other_drug_name: string | null }[];
+  strictures: boolean | null;
+  penetrations_fistulas: boolean | null;
+  abdominal_surgeries: boolean | null;
+  steroid_dependence: boolean | null;
+  steroid_resistance: boolean | null;
+  advanced_therapy_resistance: boolean | null;
+  smoking_status: string | null;
+  created_at: string;
+};
+type InitialCd = {
+  localization: string | null;
+  behavior: string | null;
+  perianal_lesions: boolean | null;
+  created_at: string;
+};
+type InitialUc = {
+  extent: string | null;
+  created_at: string;
+};
+
 // ── Label lists ───────────────────────────────────────────────────────────────
 const DRUGS = [
   { value: '5ASA',              label: '5-АСА' },
@@ -62,50 +85,66 @@ function cdSeverity(score: number) {
 export default function ClinicalRecordForm({
   patientId,
   diagnosis,
+  initialClinical = null,
+  initialCd = null,
+  initialUc = null,
 }: {
   patientId: string;
   diagnosis: Diagnosis;
+  initialClinical?: InitialClinical | null;
+  initialCd?: InitialCd | null;
+  initialUc?: InitialUc | null;
 }) {
   const router = useRouter();
   const isCD = diagnosis === 'CD';
   const isUC = diagnosis === 'UC';
 
   // ── UC-specific fields (map to UcRecordCreate) ────────────────────────────
-  const [ucExtent,           setUcExtent]          = useState('');
-  const [ucStoolFreq,        setUcStoolFreq]        = useState(0);
-  const [ucRectalBleeding,   setUcRectalBleeding]   = useState(0);
-  const [ucPhysician,        setUcPhysician]        = useState(0);
-  const [ucEndoMayo,         setUcEndoMayo]         = useState('');
-  const [ucEndoMayoOther,    setUcEndoMayoOther]    = useState('');
-  const [ucComments,         setUcComments]         = useState('');
+  const [ucExtent,        setUcExtent]        = useState(initialUc?.extent ?? '');
+  const [ucStoolFreq,     setUcStoolFreq]     = useState(0);
+  const [ucRectalBleeding,setUcRectalBleeding]= useState(0);
+  const [ucPhysician,     setUcPhysician]     = useState(0);
+  const [ucEndoMayo,      setUcEndoMayo]      = useState('');
+  const [ucEndoMayoOther, setUcEndoMayoOther] = useState('');
+  const [ucComments,      setUcComments]      = useState('');
 
   // ── CD-specific fields (map to CdRecordCreate) ────────────────────────────
-  const [cdLocalization, setCdLocalization] = useState('');
-  const [cdBehavior,     setCdBehavior]     = useState('');
-  const [cdPerianal,     setCdPerianal]     = useState('');          // 'YES'|'NO'|''
-  const [cdWellbeing,    setCdWellbeing]    = useState(0);           // general_wellbeing
-  const [cdPain,         setCdPain]         = useState(0);           // abdominal_pain
-  const [cdStool,        setCdStool]        = useState(0);           // stool_count
-  const [cdMass,         setCdMass]         = useState(0);           // abdominal_mass
-  const [cdSESCD,        setCdSESCD]        = useState('');          // ses_cd
+  const [cdLocalization, setCdLocalization] = useState(initialCd?.localization ?? '');
+  const [cdBehavior,     setCdBehavior]     = useState(initialCd?.behavior ?? '');
+  const [cdPerianal,     setCdPerianal]     = useState(
+    initialCd?.perianal_lesions === true ? 'YES' : initialCd?.perianal_lesions === false ? 'NO' : '',
+  );
+  const [cdWellbeing,    setCdWellbeing]    = useState(0);
+  const [cdPain,         setCdPain]         = useState(0);
+  const [cdStool,        setCdStool]        = useState(0);
+  const [cdMass,         setCdMass]         = useState(0);
+  const [cdSESCD,        setCdSESCD]        = useState('');
   const [cdSESOther,     setCdSESOther]     = useState('');
   const [cdComplics,     setCdComplics]     = useState<string[]>([]);
   const [cdComments,     setCdComments]     = useState('');
 
   // ── Common clinical fields (map to ClinicalRecordCreate) ──────────────────
-  const [treatments,           setTreatments]          = useState<string[]>([]);
-  const [otherDrugName,        setOtherDrugName]       = useState('');
-  const [resistantDrugs,       setResistantDrugs]      = useState<string[]>([]);
-  const [resistantDrugsOther,  setResistantDrugsOther] = useState('');
-  const [strictures,           setStrictures]          = useState<boolean | null>(null);
-  const [penetrationsFistulas, setPenetrationsFistulas]= useState<boolean | null>(null);
+  const [treatments, setTreatments] = useState<string[]>(
+    initialClinical?.treatments.map(t => t.drug) ?? [],
+  );
+  const [otherDrugName, setOtherDrugName] = useState(
+    initialClinical?.treatments.find(t => t.drug === 'OTHER')?.other_drug_name ?? '',
+  );
+  const [resistantDrugs, setResistantDrugs] = useState<string[]>(
+    initialClinical?.resistant_drugs.map(d => d.drug) ?? [],
+  );
+  const [resistantDrugsOther, setResistantDrugsOther] = useState(
+    initialClinical?.resistant_drugs.find(d => d.drug === 'OTHER')?.other_drug_name ?? '',
+  );
+  const [strictures,           setStrictures]          = useState<boolean | null>(initialClinical?.strictures ?? null);
+  const [penetrationsFistulas, setPenetrationsFistulas]= useState<boolean | null>(initialClinical?.penetrations_fistulas ?? null);
   const [fecalIncontinence,    setFecalIncontinence]   = useState('');
   const [infectiousComplics,   setInfectiousComplics]  = useState('');
-  const [abdominalSurgeries,   setAbdominalSurgeries]  = useState<boolean | null>(null);
-  const [steroidDep,           setSteroidDep]          = useState<boolean | null>(null);
-  const [steroidRes,           setSteroidRes]          = useState<boolean | null>(null);
-  const [advTherapyRes,        setAdvTherapyRes]       = useState<boolean | null>(null);
-  const [smoking,              setSmoking]             = useState('');
+  const [abdominalSurgeries,   setAbdominalSurgeries]  = useState<boolean | null>(initialClinical?.abdominal_surgeries ?? null);
+  const [steroidDep,           setSteroidDep]          = useState<boolean | null>(initialClinical?.steroid_dependence ?? null);
+  const [steroidRes,           setSteroidRes]          = useState<boolean | null>(initialClinical?.steroid_resistance ?? null);
+  const [advTherapyRes,        setAdvTherapyRes]       = useState<boolean | null>(initialClinical?.advanced_therapy_resistance ?? null);
+  const [smoking,              setSmoking]             = useState(initialClinical?.smoking_status ?? '');
   const [sideEffects,          setSideEffects]         = useState('');
   const [surgeries,            setSurgeries]           = useState<SurgeryRow[]>([]);
   const [crpRows,              setCrpRows]             = useState<LabRow[]>([{ value: '', date: '' }]);
@@ -262,6 +301,20 @@ export default function ClinicalRecordForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8 max-w-3xl mx-auto">
+
+      {/* ── Previous record notice ───────────────────────────────── */}
+      {initialClinical && (
+        <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
+          <span className="text-lg leading-none mt-0.5">ℹ</span>
+          <div>
+            <p className="font-medium">Поля перенесено з попереднього запису</p>
+            <p className="text-blue-600 text-xs mt-0.5">
+              Запис від {new Date(initialClinical.created_at).toLocaleDateString('uk-UA')} —
+              {' '}перевірте та оновіть поля, що змінились. Симптоми (біль, стілець тощо) заповніть заново.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Score banner ─────────────────────────────────────────── */}
       <div className={`flex items-center justify-between p-5 rounded-2xl border ${sev.cls}`}>
@@ -560,7 +613,7 @@ function ScaleRow({ label, max, value, onChange, hint }: {
           <label key={v} className={`flex-1 py-2.5 border rounded-xl text-center cursor-pointer transition-colors text-sm font-medium ${
             value === v ? 'border-brand bg-brand/10 text-brand' : 'border-gray-200 hover:border-brand/40 text-gray-600'
           }`}>
-            <input type="radio" className="sr-only" checked={value === v} onChange={() => onChange(v)} />
+            <input type="radio" className="sr-only" tabIndex={-1} checked={value === v} onChange={() => onChange(v)} />
             {v}
           </label>
         ))}
@@ -583,7 +636,7 @@ function RadioGroup({ label, value, onChange, options }: {
           <label key={o.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
             value === o.value ? 'border-brand bg-brand/5 text-brand' : 'border-gray-200 hover:border-brand/40'
           }`}>
-            <input type="radio" className="sr-only" checked={value === o.value} onChange={() => onChange(o.value)} />
+            <input type="radio" className="sr-only" tabIndex={-1} checked={value === o.value} onChange={() => onChange(o.value)} />
             <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
               value === o.value ? 'border-brand' : 'border-gray-300'
             }`}>
@@ -607,7 +660,7 @@ function CheckChip({ label, checked, onChange, danger = false }: {
     <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
       checked ? active : 'border-gray-200 hover:border-gray-300'
     }`}>
-      <input type="checkbox" className="sr-only" checked={checked} onChange={onChange} />
+      <input type="checkbox" className="sr-only" tabIndex={-1} checked={checked} onChange={onChange} />
       <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
         checked ? (danger ? 'bg-red-500 border-red-500' : 'bg-brand border-brand') : 'border-gray-300'
       }`}>

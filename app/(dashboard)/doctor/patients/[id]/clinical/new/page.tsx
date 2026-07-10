@@ -6,6 +6,12 @@ import ClinicalRecordForm from '@/components/ClinicalRecordForm';
 
 type Diagnosis = 'UC' | 'CD' | 'UNCLASSIFIED';
 
+const diagnosisLabel: Record<Diagnosis, string> = {
+  UC: 'Виразковий коліт (ВК)',
+  CD: 'Хвороба Крона (ХК)',
+  UNCLASSIFIED: 'ЗЗК-некласифіковане',
+};
+
 export default async function NewClinicalRecord({
   params,
 }: {
@@ -15,21 +21,32 @@ export default async function NewClinicalRecord({
   const session = await getSession();
   if (!session || session.role !== 'DOCTOR') redirect('/login');
 
-  const res = await backendFetch(`/api/v1/patients/${id}`, session.token);
-  if (res.status === 401) redirect('/login');
-  if (res.status === 404) return <div className="p-8 text-gray-500">Пацієнта не знайдено.</div>;
+  const [patientRes, latestClinicalRes, latestCdRes, latestUcRes] = await Promise.all([
+    backendFetch(`/api/v1/patients/${id}`, session.token),
+    backendFetch(`/api/v1/patients/${id}/records/clinical/latest`, session.token),
+    backendFetch(`/api/v1/patients/${id}/records/cd/latest`, session.token),
+    backendFetch(`/api/v1/patients/${id}/records/uc/latest`, session.token),
+  ]);
 
-  const patient = await res.json();
+  if (patientRes.status === 401) redirect('/login');
+  if (patientRes.status === 404)
+    return <div className="p-8 text-gray-500">Пацієнта не знайдено.</div>;
+
+  const patient = await patientRes.json();
   const diagnosis: Diagnosis =
     patient.diagnosis === 'CD' ? 'CD'
     : patient.diagnosis === 'UC' ? 'UC'
     : 'UNCLASSIFIED';
 
-  const diagnosisLabel: Record<Diagnosis, string> = {
-    UC: 'Виразковий коліт (ВК)',
-    CD: 'Хвороба Крона (ХК)',
-    UNCLASSIFIED: 'ЗЗК-некласифіковане',
-  };
+  const latestClinical = latestClinicalRes.ok
+    ? await latestClinicalRes.json().catch(() => null)
+    : null;
+  const latestCd = latestCdRes.ok
+    ? await latestCdRes.json().catch(() => null)
+    : null;
+  const latestUc = latestUcRes.ok
+    ? await latestUcRes.json().catch(() => null)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -56,6 +73,9 @@ export default async function NewClinicalRecord({
       <ClinicalRecordForm
         patientId={id}
         diagnosis={diagnosis === 'UNCLASSIFIED' ? 'UC' : diagnosis}
+        initialClinical={latestClinical}
+        initialCd={latestCd}
+        initialUc={latestUc}
       />
     </div>
   );
