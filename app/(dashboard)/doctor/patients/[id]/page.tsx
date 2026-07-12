@@ -184,10 +184,10 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
     added_by_role: string; added_by_name: string | null;
   };
   const clinicalLabs: UnifiedLab[] = clinicalRecords.flatMap(r =>
-    // Bug 4 fix: clinical labs are always doctor-added; show "Лікар" as fallback attribution
+    // Clinical labs are always doctor-added via clinical records; no badge shown (implied)
     r.lab_results.map(l => ({
       key: `c${l.id}`, rawId: l.id, lab_type: l.lab_type, value: l.value,
-      result_date: l.result_date, added_by_role: 'DOCTOR', added_by_name: 'Лікар',
+      result_date: l.result_date, added_by_role: 'DOCTOR', added_by_name: null,
     }))
   );
   const standaloneLabsUnified: UnifiedLab[] = standaloneLabs.map(l => ({
@@ -452,7 +452,8 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
 
       {/* ── Операції та лабораторія ── */}
       {(allSurgeries.length > 0 || allLabs.length > 0 || isDoctor) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        // fix #3: only use 2-col grid when both cards are present; lone lab card takes full width
+        <div className={`grid grid-cols-1 gap-6 ${allSurgeries.length > 0 ? 'md:grid-cols-2' : ''}`}>
 
           {/* Операції */}
           {allSurgeries.length > 0 && (

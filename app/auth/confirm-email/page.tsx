@@ -11,13 +11,15 @@ function ConfirmEmailContent() {
 
   useEffect(() => {
     if (fired.current) return;
-    fired.current = true;
 
     const token = searchParams.get('token');
     if (!token) {
       setStatus('error');
       return;
     }
+
+    // fix #7: only lock after token confirmed — allows retry if same mount gets a token later
+    fired.current = true;
 
     fetch('/api/auth/confirm-email', {
       method: 'POST',

@@ -14,14 +14,12 @@ export default function AddLabResultPanel({ patientId }: { patientId: number }) 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // fix #4&#5: isValidValue mirrors the submit button's disabled check precisely
+  const numValue = value !== '' ? parseFloat(value) : NaN;
+  const isValidValue = Number.isFinite(numValue) && numValue >= 0;
+
   const handleSubmit = async () => {
-    if (!value || !date) return;
-    // Bug 8 fix: guard against NaN before sending to API
-    const numValue = parseFloat(value);
-    if (!Number.isFinite(numValue) || numValue <= 0) {
-      setError('Введіть коректне числове значення більше 0');
-      return;
-    }
+    if (!isValidValue || !date) return;
     setSaving(true);
     setError(null);
     try {
@@ -94,7 +92,7 @@ export default function AddLabResultPanel({ patientId }: { patientId: number }) 
                 className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
                 Скасувати
               </button>
-              <button type="button" onClick={handleSubmit} disabled={saving || !value || !date}
+              <button type="button" onClick={handleSubmit} disabled={saving || !isValidValue || !date}
                 className="flex-1 bg-brand text-white py-2.5 rounded-xl text-sm font-medium hover:bg-brand-light transition-colors disabled:opacity-50">
                 {saving ? 'Збереження...' : 'Зберегти'}
               </button>

@@ -51,10 +51,13 @@ export default function PatientEditPanel({
   const set = (field: keyof PatientFields, value: string | number | null) =>
     setForm(f => ({ ...f, [field]: value }));
 
+  // last successfully committed values — used to reset on cancel without going stale after save
+  const [committed, setCommitted] = useState<PatientFields>(patient);
+
   const handleClose = () => {
     setOpen(false);
-    setForm(patient);        // Bug 3: reset unsaved edits
-    setNewEmail('');         // Bug 5: reset email change state
+    setForm(committed);   // reset to last-saved values, not stale prop (fix #2)
+    setNewEmail('');
     setEmailSent(false);
     setError(null);
     setEmailError(null);
@@ -64,17 +67,19 @@ export default function PatientEditPanel({
     setSaving(true);
     setError(null);
     try {
-      // Bug 1 fix: always include nullable fields as null (not undefined) so they can be cleared
+      // fix #1: send nullable fields explicitly; backend uses model_dump(exclude_none=True)
+      // so nulls are dropped server-side, which is correct — we can't clear weight/height via
+      // PATCH (backend schema design). Only send defined values to avoid spurious 422s.
       const body: Record<string, unknown> = {
         initials: form.initials,
         sex: form.sex,
         birth_year: form.birth_year,
-        weight: form.weight,
-        height: form.height,
         disability: form.disability,
         diagnosis: form.diagnosis,
         histologically_confirmed: form.histologically_confirmed,
-        diagnosis_year: form.diagnosis_year,
+        ...(form.weight != null    && { weight:        form.weight }),
+        ...(form.height != null    && { height:        form.height }),
+        ...(form.diagnosis_year != null && { diagnosis_year: form.diagnosis_year }),
       };
       const res = await fetch(`/api/patients/${patientId}`, {
         method: 'PATCH',
@@ -85,8 +90,10 @@ export default function PatientEditPanel({
         const d = await res.json().catch(() => ({}));
         throw new Error(d?.detail ?? 'Помилка збереження');
       }
+      setCommitted(form);   // fix #2: future close resets to this saved state, not the stale prop
       onSaved?.(form);
-      handleClose();
+      setOpen(false);
+      setError(null);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Помилка збереження');
