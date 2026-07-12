@@ -6,6 +6,8 @@ import type { AssessmentPoint } from '@/components/Pro2Chart';
 import { pro2Severity } from '@/lib/pro2';
 import Pro2ChartWrapper from '@/components/Pro2ChartWrapper';
 import DetachPatientButton from '@/components/DetachPatientButton';
+import PatientEditPanel from '@/components/PatientEditPanel';
+import AddLabResultPanel from '@/components/AddLabResultPanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type PatientOut = {
@@ -22,7 +24,11 @@ type PatientOut = {
 type TreatmentOut     = { id: number; drug: string; other_drug_name: string | null };
 type ResistantDrugOut = { id: number; drug: string; other_drug_name: string | null };
 type LabResultOut     = { id: number; lab_type: string; value: number; result_date: string };
-type SurgeryOut       = { id: number; operation_date: string };
+type SurgeryOut       = { id: number; operation_date: string; operation_name: string | null; description: string | null };
+type StandaloneLabResult = {
+  id: number; lab_type: string; value: number; result_date: string;
+  added_by_role: string; added_by_name: string | null; created_at: string;
+};
 
 type ClinicalRecordOut = {
   id: number; created_at: string;
@@ -128,12 +134,13 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const [patientRes, assessmentsRes, clinicalRes, cdRes, ucRes] = await Promise.all([
+  const [patientRes, assessmentsRes, clinicalRes, cdRes, ucRes, standaloneLabRes] = await Promise.all([
     backendFetch(`/api/v1/patients/${id}`, session.token),
     backendFetch(`/api/v1/patients/${id}/self-assessments`, session.token),
     backendFetch(`/api/v1/patients/${id}/records/clinical`, session.token),
     backendFetch(`/api/v1/patients/${id}/records/cd`, session.token),
     backendFetch(`/api/v1/patients/${id}/records/uc`, session.token),
+    backendFetch(`/api/v1/patients/${id}/lab-results`, session.token),
   ]);
 
   if (patientRes.status === 401) redirect('/login');
@@ -145,6 +152,7 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
   const clinicalRaw     = await clinicalRes.json().catch(() => []);
   const cdRaw           = await cdRes.json().catch(() => []);
   const ucRaw           = await ucRes.json().catch(() => []);
+  const standaloneLabRaw = standaloneLabRes.ok ? await standaloneLabRes.json().catch(() => []) : [];
 
   const assessments: AssessmentPoint[] = Array.isArray(assessmentsRaw)
     ? assessmentsRaw : (assessmentsRaw.items ?? assessmentsRaw.data ?? []);
@@ -152,6 +160,7 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
     ? clinicalRaw : (clinicalRaw.items ?? clinicalRaw.data ?? []);
   const cdRecords: CdRecordOut[] = Array.isArray(cdRaw) ? cdRaw : [];
   const ucRecords: UcRecordOut[] = Array.isArray(ucRaw) ? ucRaw : [];
+  const standaloneLabs: StandaloneLabResult[] = Array.isArray(standaloneLabRaw) ? standaloneLabRaw : [];
 
   const latestClinical   = clinicalRecords.at(-1) ?? null;
   const latestCd         = cdRecords.at(-1) ?? null;
@@ -168,8 +177,15 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
   const allSurgeries = clinicalRecords.flatMap(r => r.surgeries)
     .sort((a, b) => a.operation_date.localeCompare(b.operation_date));
 
-  // Collect all lab results across all clinical records
-  const allLabs = clinicalRecords.flatMap(r => r.lab_results)
+  // Collect all lab results: clinical records (doctor-added) + standalone
+  type UnifiedLab = { id: string; lab_type: string; value: number; result_date: string; added_by_role?: string; added_by_name?: string | null };
+  const clinicalLabs: UnifiedLab[] = clinicalRecords.flatMap(r =>
+    r.lab_results.map(l => ({ ...l, id: `c${l.id}`, added_by_role: 'DOCTOR' }))
+  );
+  const standaloneLabsUnified: UnifiedLab[] = standaloneLabs.map(l => ({
+    ...l, id: `s${l.id}`,
+  }));
+  const allLabs = [...clinicalLabs, ...standaloneLabsUnified]
     .sort((a, b) => a.result_date.localeCompare(b.result_date));
   const crpLabs          = allLabs.filter(l => l.lab_type === 'CRP');
   const calprotectinLabs = allLabs.filter(l => l.lab_type === 'CALPROTECTIN');
@@ -211,7 +227,24 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
         {/* Загальна інформація */}
-        <Card title="Загальна інформація">
+        <Card title="Загальна інформація"
+          action={isDoctor ? (
+            <PatientEditPanel
+              patientId={Number(id)}
+              patient={{
+                initials: patient.initials,
+                sex: patient.sex,
+                birth_year: patient.birth_year,
+                weight: patient.weight,
+                height: patient.height,
+                disability: patient.disability,
+                diagnosis: patient.diagnosis,
+                histologically_confirmed: patient.histologically_confirmed,
+                diagnosis_year: patient.diagnosis_year,
+                email: patient.email,
+              }}
+            />
+          ) : undefined}>
           <dl className="space-y-3 text-sm">
             <Row label="Ініціали"      value={patient.initials} />
             {patient.surname && <Row label="Прізвище"    value={patient.surname} />}
@@ -413,11 +446,23 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
           {/* Операції */}
           {allSurgeries.length > 0 && (
             <Card title={`Хірургічні втручання (${allSurgeries.length})`}>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-4 text-sm">
                 {allSurgeries.map(s => (
-                  <li key={s.id} className="flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
-                    <span>{new Date(s.operation_date).toLocaleDateString('uk-UA')}</span>
+                  <li key={s.id} className="flex gap-3">
+                    <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0 mt-1.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="text-gray-500 text-xs shrink-0">
+                          {new Date(s.operation_date).toLocaleDateString('uk-UA')}
+                        </span>
+                        {s.operation_name && (
+                          <span className="font-medium">{s.operation_name}</span>
+                        )}
+                      </div>
+                      {s.description && (
+                        <p className="text-gray-600 text-xs mt-1 whitespace-pre-wrap">{s.description}</p>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -425,8 +470,9 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
           )}
 
           {/* Лабораторні показники */}
-          {allLabs.length > 0 && (
-            <Card title="Лабораторні показники">
+          {(allLabs.length > 0 || isDoctor) && (
+            <Card title="Лабораторні показники"
+              action={isDoctor ? <AddLabResultPanel patientId={Number(id)} /> : undefined}>
               <div className="space-y-4">
                 {crpLabs.length > 0 && (
                   <div>
@@ -439,6 +485,13 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                           <tr key={l.id}>
                             <td className="py-1.5 text-gray-500">
                               {new Date(l.result_date).toLocaleDateString('uk-UA')}
+                            </td>
+                            <td className="py-1.5">
+                              {l.added_by_role === 'PATIENT'
+                                ? <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">Пацієнт</span>
+                                : l.added_by_name
+                                  ? <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">{l.added_by_name}</span>
+                                  : null}
                             </td>
                             <td className={`py-1.5 font-medium text-right ${l.value > 5 ? 'text-red-600' : 'text-green-600'}`}>
                               {l.value} мг/л
@@ -461,6 +514,13 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                             <td className="py-1.5 text-gray-500">
                               {new Date(l.result_date).toLocaleDateString('uk-UA')}
                             </td>
+                            <td className="py-1.5">
+                              {l.added_by_role === 'PATIENT'
+                                ? <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">Пацієнт</span>
+                                : l.added_by_name
+                                  ? <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">{l.added_by_name}</span>
+                                  : null}
+                            </td>
                             <td className={`py-1.5 font-medium text-right ${l.value > 50 ? 'text-red-600' : 'text-green-600'}`}>
                               {l.value} мкг/г
                             </td>
@@ -471,6 +531,9 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                   </div>
                 )}
               </div>
+              {allLabs.length === 0 && (
+                <p className="text-sm text-gray-400">Аналізів ще немає. Натисніть «+ Додати аналіз».</p>
+              )}
             </Card>
           )}
         </div>
@@ -593,11 +656,12 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function Card({
-  title, subtitle, badge, children,
+  title, subtitle, badge, action, children,
 }: {
   title: string;
   subtitle?: string;
   badge?: { label: string; cls: string };
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -607,9 +671,12 @@ function Card({
           <h2 className="text-lg font-bold">{title}</h2>
           {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
         </div>
-        {badge && (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${badge.cls}`}>{badge.label}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {action && action}
+          {badge && (
+            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${badge.cls}`}>{badge.label}</span>
+          )}
+        </div>
       </div>
       {children}
     </div>

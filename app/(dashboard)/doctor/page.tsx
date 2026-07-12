@@ -42,6 +42,12 @@ export default async function DoctorDashboard() {
     a?.pro2_score != null && pro2Severity(a.pro2_score, a.assessment_type).label === 'Тяжка'
   ).length;
 
+  // Patients with duplicate initials need a hint
+  const initialsCounts = patients.reduce<Record<string, number>>((acc, p) => {
+    acc[p.initials] = (acc[p.initials] ?? 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -81,8 +87,11 @@ export default async function DoctorDashboard() {
               return (
                 <tr key={p.id} className={`hover:bg-gray-50/50 transition-colors ${sev?.label === 'Тяжка' ? 'bg-red-50/40' : ''}`}>
                   <td className="px-4 md:px-6 py-4 font-medium">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {p.initials}
+                      {(initialsCounts[p.initials] ?? 0) > 1 && (
+                        <span className="text-[10px] text-gray-400 font-normal">#{p.id}</span>
+                      )}
                       {sev?.label === 'Тяжка' && <span className="text-red-500 text-xs">⚠</span>}
                     </div>
                   </td>

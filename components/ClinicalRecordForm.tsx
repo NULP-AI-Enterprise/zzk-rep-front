@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 type Diagnosis = 'UC' | 'CD' | 'UNCLASSIFIED';
 type LabRow = { value: string; date: string };
-type SurgeryRow = { date: string };
+type SurgeryRow = { date: string; name: string; description: string };
 
 type InitialClinical = {
   treatments: { drug: string; other_drug_name: string | null }[];
@@ -186,7 +186,11 @@ export default function ClinicalRecordForm({
     ];
 
     // Build surgeries list
-    const surgeriesList = surgeries.filter(s => s.date).map(s => ({ operation_date: s.date }));
+    const surgeriesList = surgeries.filter(s => s.date).map(s => ({
+      operation_date: s.date,
+      operation_name: s.name || null,
+      description: s.description || null,
+    }));
 
     // Build treatments list
     const treatmentsList = treatments.map(drug => ({
@@ -542,24 +546,49 @@ export default function ClinicalRecordForm({
 
       {/* ── Surgeries ─────────────────────────────────────────────── */}
       <Card title="Хірургічні втручання">
-        <div className="space-y-3">
+        <div className="space-y-6">
           {surgeries.map((s, i) => (
-            <div key={i} className="flex gap-3 items-center">
-              <span className="text-sm text-gray-500 w-24 shrink-0">Дата операції</span>
-              <input type="date" value={s.date}
-                onChange={e => {
-                  const next = [...surgeries];
-                  next[i] = { date: e.target.value };
-                  setSurgeries(next);
-                }}
-                className="field flex-1" />
+            <div key={i} className="border border-gray-100 rounded-xl p-4 space-y-3 relative">
               <button type="button"
                 onClick={() => setSurgeries(surgeries.filter((_, j) => j !== i))}
-                className="text-gray-300 hover:text-red-400 transition-colors text-xl leading-none">×</button>
+                className="absolute top-3 right-3 text-gray-300 hover:text-red-400 transition-colors text-xl leading-none">×</button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="field-label">Дата операції</label>
+                  <input type="date" value={s.date}
+                    onChange={e => {
+                      const next = [...surgeries];
+                      next[i] = { ...next[i], date: e.target.value };
+                      setSurgeries(next);
+                    }}
+                    className="field" />
+                </div>
+                <div>
+                  <label className="field-label">Назва операції</label>
+                  <input type="text" value={s.name}
+                    onChange={e => {
+                      const next = [...surgeries];
+                      next[i] = { ...next[i], name: e.target.value };
+                      setSurgeries(next);
+                    }}
+                    className="field" placeholder="Наприклад: резекція клубової кишки" />
+                </div>
+              </div>
+              <div>
+                <label className="field-label">Опис (необов'язково)</label>
+                <textarea value={s.description}
+                  onChange={e => {
+                    const next = [...surgeries];
+                    next[i] = { ...next[i], description: e.target.value };
+                    setSurgeries(next);
+                  }}
+                  className="field resize-none" rows={3}
+                  placeholder="Деталі операції, ускладнення, перебіг..." />
+              </div>
             </div>
           ))}
           <button type="button"
-            onClick={() => setSurgeries([...surgeries, { date: '' }])}
+            onClick={() => setSurgeries([...surgeries, { date: '', name: '', description: '' }])}
             className="text-sm text-brand hover:underline">
             + Додати операцію
           </button>
