@@ -178,17 +178,28 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
     .sort((a, b) => a.operation_date.localeCompare(b.operation_date));
 
   // Collect all lab results: clinical records (doctor-added) + standalone
-  type UnifiedLab = { id: string; lab_type: string; value: number; result_date: string; added_by_role?: string; added_by_name?: string | null };
+  // Bug 7 fix: keep rawId for future DELETE calls; use `key` as React key only
+  type UnifiedLab = {
+    key: string; rawId: number; lab_type: string; value: number; result_date: string;
+    added_by_role: string; added_by_name: string | null;
+  };
   const clinicalLabs: UnifiedLab[] = clinicalRecords.flatMap(r =>
-    r.lab_results.map(l => ({ ...l, id: `c${l.id}`, added_by_role: 'DOCTOR' }))
+    // Bug 4 fix: clinical labs are always doctor-added; show "Лікар" as fallback attribution
+    r.lab_results.map(l => ({
+      key: `c${l.id}`, rawId: l.id, lab_type: l.lab_type, value: l.value,
+      result_date: l.result_date, added_by_role: 'DOCTOR', added_by_name: 'Лікар',
+    }))
   );
   const standaloneLabsUnified: UnifiedLab[] = standaloneLabs.map(l => ({
-    ...l, id: `s${l.id}`,
+    key: `s${l.id}`, rawId: l.id, lab_type: l.lab_type, value: l.value,
+    result_date: l.result_date, added_by_role: l.added_by_role,
+    added_by_name: l.added_by_name,
   }));
   const allLabs = [...clinicalLabs, ...standaloneLabsUnified]
     .sort((a, b) => a.result_date.localeCompare(b.result_date));
   const crpLabs          = allLabs.filter(l => l.lab_type === 'CRP');
   const calprotectinLabs = allLabs.filter(l => l.lab_type === 'CALPROTECTIN');
+
 
   const hbiSev = cdSeverity(latestCd?.harvey_bradshaw ?? null);
   const pmSev  = ucSeverity(latestUc?.partial_mayo ?? null);
@@ -440,7 +451,7 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
       )}
 
       {/* ── Операції та лабораторія ── */}
-      {(allSurgeries.length > 0 || allLabs.length > 0) && (
+      {(allSurgeries.length > 0 || allLabs.length > 0 || isDoctor) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           {/* Операції */}
@@ -482,7 +493,7 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                     <table className="w-full text-xs">
                       <tbody className="divide-y divide-gray-100">
                         {crpLabs.map(l => (
-                          <tr key={l.id}>
+                          <tr key={l.key}>
                             <td className="py-1.5 text-gray-500">
                               {new Date(l.result_date).toLocaleDateString('uk-UA')}
                             </td>
@@ -510,7 +521,7 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                     <table className="w-full text-xs">
                       <tbody className="divide-y divide-gray-100">
                         {calprotectinLabs.map(l => (
-                          <tr key={l.id}>
+                          <tr key={l.key}>
                             <td className="py-1.5 text-gray-500">
                               {new Date(l.result_date).toLocaleDateString('uk-UA')}
                             </td>

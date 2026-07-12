@@ -1,13 +1,18 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 function ConfirmEmailContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
+  // Bug 6 fix: guard against Suspense re-mount double-posting a single-use token
+  const fired = useRef(false);
 
   useEffect(() => {
+    if (fired.current) return;
+    fired.current = true;
+
     const token = searchParams.get('token');
     if (!token) {
       setStatus('error');

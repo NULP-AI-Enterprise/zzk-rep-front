@@ -16,13 +16,19 @@ export default function AddLabResultPanel({ patientId }: { patientId: number }) 
 
   const handleSubmit = async () => {
     if (!value || !date) return;
+    // Bug 8 fix: guard against NaN before sending to API
+    const numValue = parseFloat(value);
+    if (!Number.isFinite(numValue) || numValue <= 0) {
+      setError('Введіть коректне числове значення більше 0');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       const res = await fetch(`/api/patients/${patientId}/lab-results`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lab_type: labType, value: parseFloat(value), result_date: date }),
+        body: JSON.stringify({ lab_type: labType, value: numValue, result_date: date }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));

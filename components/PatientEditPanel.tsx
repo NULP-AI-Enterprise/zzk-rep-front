@@ -51,20 +51,30 @@ export default function PatientEditPanel({
   const set = (field: keyof PatientFields, value: string | number | null) =>
     setForm(f => ({ ...f, [field]: value }));
 
+  const handleClose = () => {
+    setOpen(false);
+    setForm(patient);        // Bug 3: reset unsaved edits
+    setNewEmail('');         // Bug 5: reset email change state
+    setEmailSent(false);
+    setError(null);
+    setEmailError(null);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
+      // Bug 1 fix: always include nullable fields as null (not undefined) so they can be cleared
       const body: Record<string, unknown> = {
         initials: form.initials,
         sex: form.sex,
         birth_year: form.birth_year,
-        weight: form.weight ?? undefined,
-        height: form.height ?? undefined,
+        weight: form.weight,
+        height: form.height,
         disability: form.disability,
         diagnosis: form.diagnosis,
         histologically_confirmed: form.histologically_confirmed,
-        diagnosis_year: form.diagnosis_year ?? undefined,
+        diagnosis_year: form.diagnosis_year,
       };
       const res = await fetch(`/api/patients/${patientId}`, {
         method: 'PATCH',
@@ -76,7 +86,7 @@ export default function PatientEditPanel({
         throw new Error(d?.detail ?? 'Помилка збереження');
       }
       onSaved?.(form);
-      setOpen(false);
+      handleClose();
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Помилка збереження');
@@ -122,7 +132,7 @@ export default function PatientEditPanel({
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">Редагування профілю пацієнта</h2>
-              <button type="button" onClick={() => setOpen(false)}
+              <button type="button" onClick={handleClose}
                 className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
 
@@ -191,7 +201,7 @@ export default function PatientEditPanel({
             )}
 
             <div className="flex gap-3 pt-2">
-              <button type="button" onClick={() => setOpen(false)}
+              <button type="button" onClick={handleClose}
                 className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
                 Скасувати
               </button>
