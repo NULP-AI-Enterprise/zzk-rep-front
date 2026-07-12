@@ -7,7 +7,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const sessionCookie = cookieStore.get('session');
   if (!sessionCookie) redirect('/login');
 
-  let session: { role: string };
+  let session: { role: string; id: number };
   try {
     session = JSON.parse(sessionCookie.value);
   } catch {
@@ -15,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <DashboardShell role={session.role}>
+    <DashboardShell role={session.role} userId={session.id}>
       {children}
     </DashboardShell>
   );

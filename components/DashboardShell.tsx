@@ -6,9 +6,11 @@ import Topbar from './Topbar';
 
 export default function DashboardShell({
   role,
+  userId,
   children,
 }: {
   role: string;
+  userId?: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -32,7 +34,7 @@ export default function DashboardShell({
       </div>
 
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        <Topbar role={role} onMenuOpen={() => setOpen(true)} />
+        <Topbar role={role} userId={userId} onMenuOpen={() => setOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="max-w-6xl mx-auto">
             {children}

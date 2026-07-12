@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { AssessmentPoint } from '@/components/Pro2Chart';
 import { pro2Severity } from '@/lib/pro2';
 import Pro2ChartWrapper from '@/components/Pro2ChartWrapper';
-import StatusAction from '@/components/StatusAction';
+import DetachPatientButton from '@/components/DetachPatientButton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type PatientOut = {
@@ -191,9 +191,6 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
           <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 animate-pulse">
             ⚠ Критичний PRO2
           </span>
-        )}
-        {isDoctor && patient.status === 'ATTACHED' && (
-          <StatusAction patientId={Number(id)} currentStatus="ATTACHED" selfAttach />
         )}
         {isDoctor && (
           <Link href={`/doctor/patients/${id}/clinical/new`}
@@ -584,6 +581,11 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
             </table>
           </div>
         </Card>
+      )}
+
+      {/* ── Дії з пацієнтом ── */}
+      {isDoctor && patient.status === 'ATTACHED' && (
+        <DetachPatientButton patientId={Number(id)} />
       )}
     </div>
   );

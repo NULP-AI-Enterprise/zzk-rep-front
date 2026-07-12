@@ -606,16 +606,22 @@ function ScaleRow({ label, max, value, onChange, hint }: {
 }) {
   return (
     <div className="space-y-2">
-      <label className="block font-medium text-gray-800 text-sm">{label}</label>
+      <p className="block font-medium text-gray-800 text-sm">{label}</p>
       {hint && <p className="text-xs text-gray-400" dangerouslySetInnerHTML={{ __html: hint }} />}
       <div className="flex gap-2">
         {Array.from({ length: max + 1 }, (_, i) => i).map(v => (
-          <label key={v} className={`flex-1 py-2.5 border rounded-xl text-center cursor-pointer transition-colors text-sm font-medium ${
-            value === v ? 'border-brand bg-brand/10 text-brand' : 'border-gray-200 hover:border-brand/40 text-gray-600'
-          }`}>
-            <input type="radio" className="sr-only" tabIndex={-1} checked={value === v} onChange={() => onChange(v)} />
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={value === v}
+            onClick={() => onChange(v)}
+            className={`flex-1 py-2.5 border rounded-xl text-center cursor-pointer transition-colors text-sm font-medium ${
+              value === v ? 'border-brand bg-brand/10 text-brand' : 'border-gray-200 hover:border-brand/40 text-gray-600'
+            }`}
+          >
             {v}
-          </label>
+          </button>
         ))}
       </div>
     </div>
@@ -630,20 +636,26 @@ function RadioGroup({ label, value, onChange, options }: {
 }) {
   return (
     <div className="space-y-2">
-      <label className="field-label">{label}</label>
+      <p className="field-label">{label}</p>
       <div className="space-y-2">
         {options.map(o => (
-          <label key={o.value} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-            value === o.value ? 'border-brand bg-brand/5 text-brand' : 'border-gray-200 hover:border-brand/40'
-          }`}>
-            <input type="radio" className="sr-only" tabIndex={-1} checked={value === o.value} onChange={() => onChange(o.value)} />
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={value === o.value}
+            onClick={() => onChange(o.value)}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors text-left ${
+              value === o.value ? 'border-brand bg-brand/5 text-brand' : 'border-gray-200 hover:border-brand/40'
+            }`}
+          >
             <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
               value === o.value ? 'border-brand' : 'border-gray-300'
             }`}>
               {value === o.value && <span className="w-2 h-2 rounded-full bg-brand" />}
             </span>
             <span className="text-sm">{o.label}</span>
-          </label>
+          </button>
         ))}
       </div>
     </div>
@@ -657,10 +669,15 @@ function CheckChip({ label, checked, onChange, danger = false }: {
     ? 'border-red-300 bg-red-50 text-red-700'
     : 'border-brand bg-brand/5 text-brand';
   return (
-    <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
-      checked ? active : 'border-gray-200 hover:border-gray-300'
-    }`}>
-      <input type="checkbox" className="sr-only" tabIndex={-1} checked={checked} onChange={onChange} />
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      onClick={onChange}
+      className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
+        checked ? active : 'border-gray-200 hover:border-gray-300'
+      }`}
+    >
       <span className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${
         checked ? (danger ? 'bg-red-500 border-red-500' : 'bg-brand border-brand') : 'border-gray-300'
       }`}>
@@ -671,7 +688,7 @@ function CheckChip({ label, checked, onChange, danger = false }: {
         )}
       </span>
       <span className="text-sm">{label}</span>
-    </label>
+    </button>
   );
 }
 
