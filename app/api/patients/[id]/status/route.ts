@@ -17,6 +17,7 @@ export async function PATCH(
 
   try {
     const { id } = await params;
+    if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     const body = await request.json();
 
     const res = await backendFetch(`/api/v1/patients/${id}/status`, session.token, {
@@ -25,7 +26,7 @@ export async function PATCH(
     });
     if (res.status === 204) return NextResponse.json({ success: true }, { status: 200 });
     const text = await res.text();
-    console.log('[patients status PATCH]', id, res.status, text.slice(0, 200));
+    console.log('[patients status PATCH]', id, res.status);
     let data: unknown;
     try { data = text ? JSON.parse(text) : {}; } catch {
       return NextResponse.json({ error: `Backend error (${res.status})` }, { status: res.status });

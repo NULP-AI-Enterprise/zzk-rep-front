@@ -38,38 +38,11 @@ export default async function ModeratorPatients() {
   const session = await getSession();
   if (!session || session.role !== 'MODERATOR') redirect('/login');
 
-  const regionQ = session.region_id ? `?region_id=${session.region_id}` : '';
-
-  // Fetch all three: pending (no doctor), all (with region filter query param)
-  const [pendingRes, attachedRes] = await Promise.all([
-    backendFetch(`/api/v1/patients/pending${regionQ}`, session.token),
-    backendFetch(`/api/v1/patients${regionQ}`, session.token),
-  ]);
-
-  if (pendingRes.status === 401 || attachedRes.status === 401) redirect('/login');
-
-  const pendingRaw  = await pendingRes.json().catch(() => []);
-  const attachedRaw = await attachedRes.json().catch(() => []);
-
-  const pendingList  = parseList(pendingRaw);
-  const attachedList = parseList(attachedRaw);
-
-  // For PENDING: backend may not support region_id param — filter client-side too
-  const pending = session.region_id
-    ? pendingList.filter(p => p.region?.id === session.region_id)
-    : pendingList;
-
-  // For ATTACHED/DETACHED: filter by patient region client-side as fallback
-  const others = session.region_id
-    ? attachedList.filter(p => p.status !== 'PENDING' && p.region?.id === session.region_id)
-    : attachedList.filter(p => p.status !== 'PENDING');
-
-  // Merge, deduplicate, pending first
-  const seen = new Set<number>();
-  const patients: PatientListItem[] = [];
-  for (const p of [...pending, ...others]) {
-    if (!seen.has(p.id)) { seen.add(p.id); patients.push(p); }
-  }
+  // Backend already scopes moderators to their region (patient's own region or their doctor's)
+  const res = await backendFetch('/api/v1/patients', session.token);
+  if (res.status === 401) redirect('/login');
+  const patients = parseList(await res.json().catch(() => []))
+    .sort((a, b) => Number(b.status === 'PENDING') - Number(a.status === 'PENDING'));
 
   const pendingCount = patients.filter(p => p.status === 'PENDING').length;
 

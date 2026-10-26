@@ -16,8 +16,10 @@ export default async function AdminDashboard() {
   ]);
   if (patientsRes.status === 401 || usersRes.status === 401) redirect('/login');
 
-  const patients: PatientListItem[] = await patientsRes.json().catch(() => []);
-  const users: UserOut[] = await usersRes.json().catch(() => []);
+  const patientsRaw = await patientsRes.json().catch(() => []);
+  const patients: PatientListItem[] = Array.isArray(patientsRaw) ? patientsRaw : [];
+  const usersRaw = await usersRes.json().catch(() => []);
+  const users: UserOut[] = Array.isArray(usersRaw) ? usersRaw : [];
 
   const ucCount    = patients.filter(p => p.diagnosis === 'UC').length;
   const cdCount    = patients.filter(p => p.diagnosis === 'CD').length;

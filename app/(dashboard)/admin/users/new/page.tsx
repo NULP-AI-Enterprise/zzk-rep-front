@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDetail } from '@/lib/format';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -22,7 +23,10 @@ export default function NewUserPage() {
   });
 
   useEffect(() => {
-    fetch('/api/regions').then(r => r.json()).then(setRegions).catch(() => {});
+    fetch('/api/regions')
+      .then(r => (r.ok ? r.json() : []))
+      .then(d => setRegions(Array.isArray(d) ? d : []))
+      .catch(() => {});
   }, []);
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -53,7 +57,7 @@ export default function NewUserPage() {
       router.push('/admin/users');
     } else {
       const body = await res.json().catch(() => ({}));
-      setErrorMsg(body?.detail ?? body?.error ?? 'Помилка при створенні');
+      setErrorMsg(formatDetail(body?.detail ?? body?.error, 'Помилка при створенні'));
       setStatus('error');
     }
   };

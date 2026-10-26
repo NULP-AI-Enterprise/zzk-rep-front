@@ -21,9 +21,9 @@ export default async function PatientDashboard() {
   );
   if (res.status === 401) redirect('/login');
   const raw = await res.json().catch(() => []);
-  console.log('[patient] assessments raw:', JSON.stringify(raw));
   const assessments: SelfAssessmentOut[] = Array.isArray(raw) ? raw : (raw.items ?? raw.data ?? raw.results ?? []);
-  const latest = assessments.at(-1) ?? null;
+  // backend returns newest first
+  const latest = assessments[0] ?? null;
 
   return (
     <div className="space-y-6">

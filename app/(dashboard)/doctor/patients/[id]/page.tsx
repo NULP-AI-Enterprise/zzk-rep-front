@@ -143,8 +143,10 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
     backendFetch(`/api/v1/patients/${id}/lab-results`, session.token),
   ]);
 
-  if (patientRes.status === 401) redirect('/login');
+  if ([patientRes, assessmentsRes, clinicalRes, cdRes, ucRes].some(r => r.status === 401)) redirect('/login');
   if (patientRes.status === 404) return <div className="p-8 text-gray-500">Пацієнта не знайдено.</div>;
+  if (patientRes.status === 403) return <div className="p-8 text-gray-500">Немає доступу до цього пацієнта.</div>;
+  if (!patientRes.ok) return <div className="p-8 text-red-500">Не вдалося завантажити дані пацієнта. Спробуйте пізніше.</div>;
 
   const patient: PatientOut = await patientRes.json();
 
@@ -154,12 +156,15 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
   const ucRaw           = await ucRes.json().catch(() => []);
   const standaloneLabRaw = standaloneLabRes.ok ? await standaloneLabRes.json().catch(() => []) : [];
 
-  const assessments: AssessmentPoint[] = Array.isArray(assessmentsRaw)
-    ? assessmentsRaw : (assessmentsRaw.items ?? assessmentsRaw.data ?? []);
-  const clinicalRecords: ClinicalRecordOut[] = Array.isArray(clinicalRaw)
-    ? clinicalRaw : (clinicalRaw.items ?? clinicalRaw.data ?? []);
-  const cdRecords: CdRecordOut[] = Array.isArray(cdRaw) ? cdRaw : [];
-  const ucRecords: UcRecordOut[] = Array.isArray(ucRaw) ? ucRaw : [];
+  // Backend returns newest-first (id DESC). Everything below ("latest" = .at(-1), charts,
+  // .reverse() for history tables) expects oldest-first, so normalise once here.
+  const chronological = <T extends { id: number }>(rows: unknown): T[] =>
+    (Array.isArray(rows) ? [...(rows as T[])] : []).sort((x, y) => x.id - y.id);
+
+  const assessments = chronological<AssessmentPoint>(assessmentsRaw);
+  const clinicalRecords = chronological<ClinicalRecordOut>(clinicalRaw);
+  const cdRecords = chronological<CdRecordOut>(cdRaw);
+  const ucRecords = chronological<UcRecordOut>(ucRaw);
   const standaloneLabs: StandaloneLabResult[] = Array.isArray(standaloneLabRaw) ? standaloneLabRaw : [];
 
   const latestClinical   = clinicalRecords.at(-1) ?? null;
@@ -204,7 +209,8 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
   const hbiSev = cdSeverity(latestCd?.harvey_bradshaw ?? null);
   const pmSev  = ucSeverity(latestUc?.partial_mayo ?? null);
 
-  const backHref = session.role === 'ADMIN' ? '/admin/patients' : '/doctor';
+  const backHref =
+    session.role === 'ADMIN' ? '/admin/patients' : session.role === 'MODERATOR' ? '/moderator/patients' : '/doctor';
 
   return (
     <div className="space-y-6">

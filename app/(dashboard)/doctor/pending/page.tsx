@@ -32,7 +32,7 @@ export default async function DoctorPending() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Очікують дії</h1>
-          <p className="text-gray-500 text-sm mt-1">Пацієнти зі статусом PENDING, що потребують прикріплення.</p>
+          <p className="text-gray-500 text-sm mt-1">Ваші пацієнти, що очікують підтвердження, та пацієнти, які зареєструвалися самі й ще не мають лікаря.</p>
         </div>
         {pending.length > 0 && (
           <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-50 text-yellow-700">

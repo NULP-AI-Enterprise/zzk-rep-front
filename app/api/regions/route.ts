@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { backendFetch } from '@/lib/api';
 
+const BACKEND = process.env.BACKEND_URL ?? 'https://zzk-registr.thesis-i.com';
+
+// Public (the self-registration form needs it before login)
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('session');
-    if (!sessionCookie) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const session = JSON.parse(sessionCookie.value);
-
-    const res = await backendFetch('/api/v1/regions', session.token);
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const res = await fetch(`${BACKEND}/api/v1/regions`, { cache: 'no-store' });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !Array.isArray(data)) {
+      return NextResponse.json({ error: 'Не вдалося завантажити регіони' }, { status: res.ok ? 502 : res.status });
+    }
+    return NextResponse.json(data);
   } catch {
-    return NextResponse.json({ error: 'Failed to fetch regions' }, { status: 500 });
+    return NextResponse.json({ error: 'Не вдалося завантажити регіони' }, { status: 502 });
   }
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDetail } from '@/lib/format';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -31,11 +32,14 @@ export default function StatusAction({
   const [error, setError]     = useState('');
 
   useEffect(() => {
-    if (!open) return;
-    fetch('/api/admin/users')
-      .then(r => r.json())
-      .then((users: { id: number; role: string; first_name: string; last_name: string }[]) => {
-        const docs = Array.isArray(users) ? users.filter(u => u.role === 'DOCTOR') : [];
+    // a doctor attaching a patient to themselves needs no doctor list (and may not read it)
+    if (!open || selfAttach) return;
+    fetch('/api/doctors')
+      .then(async r => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error ?? 'Не вдалося завантажити лікарів');
+        return r.json();
+      })
+      .then((docs: Doctor[]) => {
         // Put suggested doctor first
         if (suggestedDoctorId) {
           const idx = docs.findIndex(d => d.id === suggestedDoctorId);
@@ -44,7 +48,7 @@ export default function StatusAction({
         setDoctors(docs);
         if (suggestedDoctorId && !doctorId) setDoctorId(String(suggestedDoctorId));
       })
-      .catch(() => {});
+      .catch(e => setError(e instanceof Error ? e.message : 'Не вдалося завантажити лікарів'));
   }, [open]);
 
   const handleSubmit = async () => {
@@ -69,7 +73,7 @@ export default function StatusAction({
       router.refresh();
     } else {
       const data = await res.json().catch(() => ({}));
-      setError(data?.detail ?? data?.error ?? 'Помилка');
+      setError(formatDetail(data?.detail ?? data?.error, 'Помилка'));
       setLoading(false);
     }
   };

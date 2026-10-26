@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDetail } from '@/lib/format';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -30,7 +31,7 @@ export default function AddLabResultPanel({ patientId }: { patientId: number }) 
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? d?.error ?? 'Помилка збереження');
+        throw new Error(formatDetail(d?.detail ?? d?.error, 'Помилка збереження'));
       }
       setOpen(false);
       setValue('');

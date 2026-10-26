@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDetail } from '@/lib/format';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -71,7 +72,8 @@ export default function PatientEditPanel({
       // so nulls are dropped server-side, which is correct — we can't clear weight/height via
       // PATCH (backend schema design). Only send defined values to avoid spurious 422s.
       const body: Record<string, unknown> = {
-        initials: form.initials,
+        // legacy initials (e.g. "О.П.П.") would fail the new format check — send only when edited
+        ...(form.initials !== committed.initials && { initials: form.initials }),
         sex: form.sex,
         birth_year: form.birth_year,
         disability: form.disability,
@@ -88,7 +90,7 @@ export default function PatientEditPanel({
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? 'Помилка збереження');
+        throw new Error(formatDetail(d?.detail ?? d?.error, 'Помилка збереження'));
       }
       setCommitted(form);   // fix #2: future close resets to this saved state, not the stale prop
       onSaved?.(form);
@@ -114,7 +116,7 @@ export default function PatientEditPanel({
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d?.detail ?? d?.error ?? 'Помилка');
+        throw new Error(formatDetail(d?.detail ?? d?.error, 'Помилка'));
       }
       setEmailSent(true);
     } catch (e) {
@@ -146,7 +148,8 @@ export default function PatientEditPanel({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <label className="field-label">Ініціали</label>
-                <input type="text" value={form.initials} onChange={e => set('initials', e.target.value)}
+                <input type="text" value={form.initials} maxLength={4} placeholder="ТГК"
+                  onChange={e => set('initials', e.target.value.replace(/[^\p{L}]/gu, '').toUpperCase())}
                   className="field" />
               </div>
               <div>

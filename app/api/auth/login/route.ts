@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { formatDetail } from '@/lib/format';
 
 const BACKEND = process.env.BACKEND_URL ?? 'https://zzk-registr.thesis-i.com';
 
@@ -11,11 +12,10 @@ export async function POST(request: Request) {
       body: JSON.stringify({ email }),
     });
     const body = await res.json().catch(() => null);
-    console.log('[login] backend ←', res.status, body);
     if (!res.ok) {
-      const err = body ?? {};
+      const detail = (body as { detail?: unknown } | null)?.detail;
       return NextResponse.json(
-        { error: (err as { detail?: string }).detail ?? JSON.stringify(err) ?? 'Failed to send magic link' },
+        { error: formatDetail(detail, 'Не вдалося надіслати посилання') },
         { status: res.status },
       );
     }

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDetail } from '@/lib/format';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -20,7 +21,7 @@ export default function DetachPatientButton({ patientId }: { patientId: number }
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.detail ?? 'Помилка відкріплення');
+        throw new Error(formatDetail(data?.detail ?? data?.error, 'Помилка відкріплення'));
       }
       router.push('/doctor');
     } catch (e) {

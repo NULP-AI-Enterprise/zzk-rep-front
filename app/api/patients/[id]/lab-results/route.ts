@@ -10,6 +10,8 @@ export async function GET(
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = await params;
+
+  if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
   const res = await backendFetch(`/api/v1/patients/${id}/lab-results`, session.token);
   const text = await res.text();
   let data: unknown;
@@ -28,6 +30,7 @@ export async function POST(
 
   try {
     const { id } = await params;
+    if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     const body = await request.json();
     const res = await backendFetch(`/api/v1/patients/${id}/lab-results`, session.token, {
       method: 'POST',

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { formatDetail } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 
 type Diagnosis = 'UC' | 'CD' | 'UNCLASSIFIED';
@@ -170,6 +171,9 @@ export default function ClinicalRecordForm({
     setRows(next);
   }
 
+  const clinicalSaved = useRef(false);
+  const diseaseSaved = useRef(false);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -253,42 +257,41 @@ export default function ClinicalRecordForm({
     }
 
     try {
-      // Send both requests in parallel
-      const requests: Promise<Response>[] = [
-        fetch(`/api/patients/${patientId}/clinical`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(clinicalBody),
-        }),
-      ];
-
+      // Sequential, and remember what is already saved: a retry after a partial failure
+      // must not create a duplicate record.
       const diseaseEndpoint = isCD ? 'cd' : isUC ? 'uc' : null;
+      const steps: { done: { current: boolean }; url: string; body: unknown }[] = [
+        { done: clinicalSaved, url: `/api/patients/${patientId}/clinical`, body: clinicalBody },
+      ];
       if (diseaseEndpoint && diseaseBody) {
-        requests.push(
-          fetch(`/api/patients/${patientId}/${diseaseEndpoint}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(diseaseBody),
-          }),
-        );
+        steps.push({ done: diseaseSaved, url: `/api/patients/${patientId}/${diseaseEndpoint}`, body: diseaseBody });
       }
 
-      const responses = await Promise.all(requests);
-      const errors: string[] = [];
-
-      for (const res of responses) {
-        if (!res.ok) {
+      let failed = false;
+      for (const step of steps) {
+        if (step.done.current) continue;
+        const res = await fetch(step.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(step.body),
+        });
+        if (res.ok) {
+          step.done.current = true;
+        } else {
           const data = await res.json().catch(() => ({}));
-          const msg = Array.isArray(data.detail)
-            ? data.detail.map((d: { msg: string }) => d.msg).join('; ')
-            : (data.detail ?? data.error ?? `Помилка (${res.status})`);
-          errors.push(msg);
+          const msg = formatDetail(data.detail ?? data.error, `Помилка (${res.status})`);
+          const savedSomething = steps.some(st => st.done.current);
+          setError(
+            savedSomething
+              ? `${msg}. Частину даних уже збережено — повторне надсилання пропустить збережені розділи; зміни в них вносьте через новий запис.`
+              : msg,
+          );
+          failed = true;
+          break;
         }
       }
 
-      if (errors.length > 0) {
-        setError(errors.join(' | '));
-      } else {
+      if (!failed) {
         router.push(`/doctor/patients/${patientId}`);
         router.refresh();
       }

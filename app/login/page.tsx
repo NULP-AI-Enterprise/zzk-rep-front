@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Mail } from 'lucide-react';
 
 export default function LoginPage() {
@@ -13,30 +14,24 @@ export default function LoginPage() {
     setStatus('loading');
     setErrorMsg('');
 
-    console.log('[login] → POST /api/auth/login', { email });
-
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim() }),
       });
 
       const body = await res.json().catch(() => null);
-      console.log('[login] ← status', res.status, body);
-
       if (res.ok) {
-        console.log('[login] magic link sent successfully');
         setStatus('success');
       } else {
         const msg = body?.error ?? `HTTP ${res.status}`;
-        console.error('[login] backend error:', msg);
         setErrorMsg(msg);
         setStatus('error');
       }
     } catch (err) {
-      console.error('[login] network/fetch error:', err);
-      setErrorMsg('Мережева помилка — перевірте консоль');
+      console.error('[login] network error', err);
+      setErrorMsg('Мережева помилка. Спробуйте ще раз.');
       setStatus('error');
     }
   };
@@ -80,6 +75,11 @@ export default function LoginPage() {
             </button>
           </form>
         )}
+
+        <p className="text-center text-sm text-gray-500 mt-6">
+          Ви пацієнт і ще не зареєстровані?{' '}
+          <Link href="/register" className="text-brand font-medium hover:underline">Зареєструватися</Link>
+        </p>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDetail } from '@/lib/format';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -44,7 +45,10 @@ export default function UserActions({ user }: { user: User }) {
 
   useEffect(() => {
     if (mode !== 'edit') return;
-    fetch('/api/regions').then(r => r.json()).then(setRegions).catch(() => {});
+    fetch('/api/regions')
+      .then(r => (r.ok ? r.json() : []))
+      .then(d => setRegions(Array.isArray(d) ? d : []))
+      .catch(() => {});
   }, [mode]);
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -73,7 +77,7 @@ export default function UserActions({ user }: { user: User }) {
       router.refresh();
     } else {
       const data = await res.json().catch(() => ({}));
-      setError(data?.detail ?? data?.error ?? 'Помилка збереження');
+      setError(formatDetail(data?.detail ?? data?.error, 'Помилка збереження'));
     }
     setSaving(false);
   }
@@ -85,7 +89,7 @@ export default function UserActions({ user }: { user: User }) {
       router.refresh();
     } else {
       const data = await res.json().catch(() => ({}));
-      setError(data?.detail ?? data?.error ?? 'Помилка видалення');
+      setError(formatDetail(data?.detail ?? data?.error, 'Помилка видалення'));
       setDeleting(false);
       setMode('idle');
     }
@@ -184,6 +188,8 @@ export default function UserActions({ user }: { user: User }) {
 
   // ── Default: action buttons ───────────────────────────────────────────────
   return (
+    <div className="flex flex-col gap-1">
+    {error && <p className="text-red-500 text-xs max-w-[220px]">{error}</p>}
     <div className="flex gap-1.5">
       <button onClick={() => setMode('edit')}
         className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
@@ -193,6 +199,7 @@ export default function UserActions({ user }: { user: User }) {
         className="px-2.5 py-1 text-xs font-medium border border-red-200 rounded-lg hover:bg-red-50 text-red-600 transition-colors">
         Видалити
       </button>
+    </div>
     </div>
   );
 }

@@ -1,64 +1,18 @@
-'use client';
+import MagicLinkVerify from '@/components/MagicLinkVerify';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-
-function VerifyContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [status, setStatus] = useState<'verifying' | 'error'>('verifying');
-
-  useEffect(() => {
-    const token = searchParams.get('token');
-    if (!token) {
-      setStatus('error');
-      return;
-    }
-
-    fetch('/api/auth/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    })
-      .then(async res => {
-        if (res.ok) {
-          const { role } = await res.json();
-          if (role === 'ADMIN')         router.push('/admin');
-          else if (role === 'DOCTOR')    router.push('/doctor');
-          else if (role === 'MODERATOR') router.push('/moderator');
-          else                           router.push('/patient');
-        } else {
-          setStatus('error');
-        }
-      })
-      .catch(() => setStatus('error'));
-  }, [searchParams, router]);
-
+export default async function VerifyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ token?: string | string[] }>;
+}) {
+  const { token } = await searchParams;
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.08)] w-full max-w-md text-center">
-      {status === 'verifying' ? (
-        <div className="animate-pulse text-gray-600">Перевірка токену...</div>
-      ) : (
-        <div className="text-red-500">
-          Помилка верифікації. Посилання недійсне або протерміноване.
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function VerifyPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Suspense
-        fallback={
-          <div className="bg-white p-8 rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.08)] w-full max-w-md text-center animate-pulse text-gray-600">
-            Завантаження...
-          </div>
-        }
-      >
-        <VerifyContent />
-      </Suspense>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <MagicLinkVerify
+        token={typeof token === 'string' && token ? token : null}
+        title="Вхід в ЗЗК Реєстр"
+        description="Натисніть кнопку, щоб увійти в систему."
+      />
     </div>
   );
 }

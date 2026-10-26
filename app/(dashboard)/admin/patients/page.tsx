@@ -32,7 +32,8 @@ export default async function AdminPatients() {
 
   const res = await backendFetch('/api/v1/patients', session.token);
   if (res.status === 401) redirect('/login');
-  const patients: PatientListItem[] = await res.json().catch(() => []);
+  const raw = await res.json().catch(() => []);
+  const patients: PatientListItem[] = Array.isArray(raw) ? raw : [];
 
   return (
     <div className="space-y-6">

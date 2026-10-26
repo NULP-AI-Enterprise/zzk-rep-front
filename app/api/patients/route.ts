@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       body: JSON.stringify(body),
     });
     const text = await res.text();
-    console.log('[patients POST] status', res.status, text.slice(0, 200));
+    console.log('[patients POST] status', res.status);
 
     let data: unknown;
     try {

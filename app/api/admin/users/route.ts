@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       body: JSON.stringify(body),
     });
     const text = await res.text();
-    console.log('[admin/users POST] status', res.status, text.slice(0, 200));
+    console.log('[admin/users POST] status', res.status);
     const data = text ? JSON.parse(text) : {};
     return NextResponse.json(data, { status: res.status });
   } catch (err) {

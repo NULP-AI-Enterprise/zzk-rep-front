@@ -11,6 +11,7 @@ export async function PATCH(
 
   try {
     const { id } = await params;
+    if (!/^\d+$/.test(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     const body = await request.json();
 
     const res = await backendFetch(`/api/v1/patients/${id}`, session.token, {

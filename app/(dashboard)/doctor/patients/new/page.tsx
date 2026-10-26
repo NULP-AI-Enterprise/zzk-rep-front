@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatDetail } from '@/lib/format';
+
+const THIS_YEAR = new Date().getFullYear();
 
 type Region = { id: number; name: string };
 
 type Form = {
   initials: string;
-  surname: string;
   sex: 'M' | 'F';
   email: string;
   birth_year: string;
@@ -22,7 +24,6 @@ type Form = {
 
 const INIT: Form = {
   initials: '',
-  surname: '',
   sex: 'M',
   email: '',
   birth_year: '',
@@ -45,8 +46,8 @@ export default function NewPatientForm() {
 
   useEffect(() => {
     fetch('/api/regions')
-      .then(r => r.json())
-      .then((d: Region[]) => setRegions(d))
+      .then(r => (r.ok ? r.json() : []))
+      .then((d: unknown) => setRegions(Array.isArray(d) ? (d as Region[]) : []))
       .catch(() => {});
   }, []);
 
@@ -56,6 +57,10 @@ export default function NewPatientForm() {
   const goNext = () => {
     if (!form.initials || !form.email || !form.birth_year) {
       setError("Заповніть всі обов'язкові поля (*)");
+      return;
+    }
+    if (form.initials.length < 2 || form.initials.length > 4) {
+      setError('Ініціали: 2–4 літери, наприклад ТГК');
       return;
     }
     setError('');
@@ -75,7 +80,6 @@ export default function NewPatientForm() {
         histologically_confirmed: form.histologically_confirmed,
         disability: form.disability,
       };
-      if (form.surname) body.surname = form.surname;
       if (form.weight) body.weight = Number(form.weight);
       if (form.height) body.height = Number(form.height);
       if (form.region_id) body.region_id = Number(form.region_id);
@@ -88,11 +92,7 @@ export default function NewPatientForm() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(
-          Array.isArray(data.detail)
-            ? data.detail.map((d: { msg: string }) => d.msg).join('; ')
-            : (data.error ?? 'Помилка реєстрації'),
-        );
+        setError(formatDetail(data.detail ?? data.error, 'Помилка реєстрації'));
       } else {
         router.push(`/doctor/patients/${(data as { id: number }).id}`);
       }
@@ -117,22 +117,14 @@ export default function NewPatientForm() {
           <div className="space-y-6">
             <h2 className="text-xl font-bold">Крок 1: Загальна інформація</h2>
             <div className="grid grid-cols-2 gap-6">
-              <Field label="Ініціали *" hint="О.П.П.">
+              <Field label="Ініціали *" hint="ТГК — перші літери прізвища, імені, по батькові">
                 <input
                   type="text"
                   required
+                  maxLength={4}
                   value={form.initials}
-                  onChange={e => set('initials', e.target.value)}
-                  placeholder="О.П.П."
-                  className="field"
-                />
-              </Field>
-              <Field label="Прізвище">
-                <input
-                  type="text"
-                  value={form.surname}
-                  onChange={e => set('surname', e.target.value)}
-                  placeholder="Іванов"
+                  onChange={e => set('initials', e.target.value.replace(/[^\p{L}]/gu, '').toUpperCase())}
+                  placeholder="ТГК"
                   className="field"
                 />
               </Field>
@@ -151,7 +143,7 @@ export default function NewPatientForm() {
                   type="number"
                   required
                   min={1900}
-                  max={2025}
+                  max={THIS_YEAR}
                   value={form.birth_year}
                   onChange={e => set('birth_year', e.target.value)}
                   placeholder="1985"
@@ -245,8 +237,8 @@ export default function NewPatientForm() {
               <Field label="Рік встановлення діагнозу">
                 <input
                   type="number"
-                  min={1950}
-                  max={2026}
+                  min={1900}
+                  max={THIS_YEAR}
                   value={form.diagnosis_year}
                   onChange={e => set('diagnosis_year', e.target.value)}
                   placeholder="2020"
@@ -304,12 +296,12 @@ function Field({
   hint?: string;
 }) {
   return (
-    <div className={className}>
-      <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
+    <label className={`block ${className}`}>
+      <span className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
         {label}
         {hint && <span className="ml-1 normal-case font-normal text-gray-300">{hint}</span>}
-      </label>
+      </span>
       {children}
-    </div>
+    </label>
   );
 }

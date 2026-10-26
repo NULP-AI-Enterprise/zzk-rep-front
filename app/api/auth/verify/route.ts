@@ -3,20 +3,35 @@ import { cookies } from 'next/headers';
 
 const BACKEND = process.env.BACKEND_URL ?? 'https://zzk-registr.thesis-i.com';
 
-export async function POST(request: Request) {
-  try {
-    const { token } = await request.json();
+const roleHome: Record<string, string> = {
+  ADMIN: '/admin',
+  DOCTOR: '/doctor',
+  MODERATOR: '/moderator',
+  PATIENT: '/patient',
+};
 
-    console.log('[verify] → POST', `${BACKEND}/api/v1/auth/verify`);
+export async function POST(request: Request) {
+  let token: unknown;
+  try {
+    ({ token } = await request.json());
+  } catch {
+    return NextResponse.json({ error: 'Невалідний запит' }, { status: 400 });
+  }
+  if (typeof token !== 'string' || !token) {
+    return NextResponse.json({ error: 'Невалідне посилання' }, { status: 400 });
+  }
+
+  try {
     const tokenRes = await fetch(`${BACKEND}/api/v1/auth/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     });
     const tokenBody = await tokenRes.json().catch(() => null);
-    console.log('[verify] ← status', tokenRes.status, tokenBody);
     if (!tokenRes.ok) {
-      return NextResponse.json({ error: tokenBody?.detail ?? 'Invalid or expired link' }, { status: 401 });
+      console.warn('[verify] backend rejected token, status', tokenRes.status);
+      const detail = typeof tokenBody?.detail === 'string' ? tokenBody.detail : 'Невалідне або протерміноване посилання';
+      return NextResponse.json({ error: detail }, { status: tokenRes.status >= 500 ? 502 : 400 });
     }
     const { access_token } = tokenBody;
 
@@ -24,26 +39,13 @@ export async function POST(request: Request) {
       headers: { Authorization: `Bearer ${access_token}` },
     });
     if (!meRes.ok) {
-      return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 401 });
+      console.error('[verify] /auth/me failed, status', meRes.status);
+      return NextResponse.json({ error: 'Посилання використано, але профіль не завантажився. Запросіть нове посилання для входу.' }, { status: 502 });
     }
     const me = await meRes.json();
 
-    let patient_id: number | null = null;
-    let diagnosis: string | null = null;
-
-    if (me.role === 'PATIENT') {
-      const profileRes = await fetch(`${BACKEND}/api/v1/patients/my`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      });
-      if (profileRes.ok) {
-        const profile = await profileRes.json().catch(() => null);
-        patient_id = profile?.id ?? null;
-        diagnosis = profile?.diagnosis ?? null;
-      } else {
-        // fallback: assume patient profile id equals user id
-        patient_id = me.id;
-      }
-    }
+    // For patients /auth/me already returns the patient profile (id = patient profile id)
+    const isPatient = me.role === 'PATIENT';
 
     const cookieStore = await cookies();
     cookieStore.set(
@@ -53,19 +55,21 @@ export async function POST(request: Request) {
         id: me.id,
         token: access_token,
         region_id: me.region?.id ?? null,
-        patient_id,
-        diagnosis,
+        patient_id: isPatient ? me.id : null,
+        diagnosis: isPatient ? (me.diagnosis ?? null) : null,
       }),
       {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
         path: '/',
         maxAge: 60 * 60 * 24 * 7,
       },
     );
 
-    return NextResponse.json({ success: true, role: me.role });
-  } catch {
-    return NextResponse.json({ error: 'Verification failed' }, { status: 401 });
+    return NextResponse.json({ success: true, role: me.role, home: roleHome[me.role] ?? '/' });
+  } catch (err) {
+    console.error('[verify] unexpected error', err);
+    return NextResponse.json({ error: 'Сервер недоступний. Спробуйте ще раз' }, { status: 502 });
   }
 }

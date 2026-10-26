@@ -1,18 +1,10 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import DashboardShell from '@/components/DashboardShell';
+import { getSession } from '@/lib/session';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('session');
-  if (!sessionCookie) redirect('/login');
-
-  let session: { role: string; id: number };
-  try {
-    session = JSON.parse(sessionCookie.value);
-  } catch {
-    redirect('/login');
-  }
+  const session = await getSession();
+  if (!session) redirect('/login');
 
   return (
     <DashboardShell role={session.role} userId={session.id}>
