@@ -2,6 +2,7 @@ import { getSession } from '@/lib/session';
 import { backendFetch } from '@/lib/api';
 import { redirect } from 'next/navigation';
 import StatusAction from '@/components/StatusAction';
+import Link from 'next/link';
 
 type PatientListItem = {
   id: number;
@@ -80,6 +81,7 @@ export default async function ModeratorPatients() {
                 <th className="px-4 md:px-6 py-4 font-medium hidden md:table-cell">Регіон</th>
                 <th className="px-4 md:px-6 py-4 font-medium">Статус</th>
                 <th className="px-4 md:px-6 py-4 font-medium hidden sm:table-cell">Реєстрація</th>
+                <th className="px-4 md:px-6 py-4 font-medium">Деталі</th>
                 <th className="px-4 md:px-6 py-4 font-medium">Дія</th>
               </tr>
             </thead>
@@ -102,6 +104,11 @@ export default async function ModeratorPatients() {
                     </td>
                     <td className="px-4 md:px-6 py-4 text-gray-500 hidden sm:table-cell">
                       {new Date(p.created_at).toLocaleDateString('uk-UA')}
+                    </td>
+                    <td className="px-4 md:px-6 py-4">
+                      <Link href={`/moderator/patients/${p.id}`} className="text-brand hover:underline font-medium text-sm">
+                        Деталі
+                      </Link>
                     </td>
                     <td className="px-4 md:px-6 py-4">
                       <StatusAction
