@@ -19,6 +19,10 @@ type InitialClinical = {
   advanced_therapy_resistance: boolean | null;
   smoking_status: string | null;
   created_at: string;
+  fecal_incontinence?: string | null;
+  infectious_complications?: string | null;
+  side_effects?: string | null;
+  surgeries?: { operation_date: string; operation_name: string | null; description: string | null }[];
 };
 type InitialCd = {
   localization: string | null;
@@ -139,17 +143,21 @@ export default function ClinicalRecordForm({
   );
   const [strictures,           setStrictures]          = useState<boolean | null>(initialClinical?.strictures ?? null);
   const [penetrationsFistulas, setPenetrationsFistulas]= useState<boolean | null>(initialClinical?.penetrations_fistulas ?? null);
-  const [fecalIncontinence,    setFecalIncontinence]   = useState('');
-  const [infectiousComplics,   setInfectiousComplics]  = useState('');
+  const [fecalIncontinence,    setFecalIncontinence]   = useState(initialClinical?.fecal_incontinence ?? '');
+  const [infectiousComplics,   setInfectiousComplics]  = useState(initialClinical?.infectious_complications ?? '');
   const [abdominalSurgeries,   setAbdominalSurgeries]  = useState<boolean | null>(initialClinical?.abdominal_surgeries ?? null);
   const [steroidDep,           setSteroidDep]          = useState<boolean | null>(initialClinical?.steroid_dependence ?? null);
   const [steroidRes,           setSteroidRes]          = useState<boolean | null>(initialClinical?.steroid_resistance ?? null);
   const [advTherapyRes,        setAdvTherapyRes]       = useState<boolean | null>(initialClinical?.advanced_therapy_resistance ?? null);
   const [smoking,              setSmoking]             = useState(initialClinical?.smoking_status ?? '');
-  const [sideEffects,          setSideEffects]         = useState('');
-  const [surgeries,            setSurgeries]           = useState<SurgeryRow[]>([]);
-  const [crpRows,              setCrpRows]             = useState<LabRow[]>([{ value: '', date: '' }]);
-  const [calpRows,             setCalpRows]            = useState<LabRow[]>([{ value: '', date: '' }]);
+  const [sideEffects,          setSideEffects]         = useState(initialClinical?.side_effects ?? '');
+  const [surgeries,            setSurgeries]           = useState<SurgeryRow[]>(
+      (initialClinical?.surgeries ?? []).map(s => ({
+        date: s.operation_date, name: s.operation_name ?? '', description: s.description ?? '',
+      })),
+  );
+  const [crpRows,              setCrpRows]             = useState<LabRow[]>([{ value: '', date: new Date().toLocaleDateString('sv-SE') }]);
+  const [calpRows,             setCalpRows]            = useState<LabRow[]>([{ value: '', date: new Date().toLocaleDateString('sv-SE') }]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -179,6 +187,18 @@ export default function ClinicalRecordForm({
     setSubmitting(true);
     setError('');
 
+
+    if ([...crpRows, ...calpRows].some(r => r.value && !r.date)) {
+      setError('У лабораторних показниках заповніть і значення, і дату');
+      setSubmitting(false);
+      return;
+    }
+    if (abdominalSurgeries === true && surgeries.some(s => (s.name || s.description) && !s.date)) {
+      setError('У кожної операції вкажіть дату');
+      setSubmitting(false);
+      return;
+    }
+
     // Build lab_results in backend format
     const labResults = [
       ...crpRows.filter(r => r.value && r.date).map(r => ({
@@ -190,7 +210,7 @@ export default function ClinicalRecordForm({
     ];
 
     // Build surgeries list
-    const surgeriesList = surgeries.filter(s => s.date).map(s => ({
+    const surgeriesList = (abdominalSurgeries === true ? surgeries : []).filter(s => s.date).map(s => ({
       operation_date: s.date,
       operation_name: s.name || null,
       description: s.description || null,
@@ -495,7 +515,10 @@ export default function ClinicalRecordForm({
             {RESISTANT_DRUGS.map(d => (
               <CheckChip key={d.value} label={d.label}
                 checked={resistantDrugs.includes(d.value)}
-                onChange={() => toggleList(resistantDrugs, setResistantDrugs, d.value)}
+                         onChange={() => {
+                           toggleList(resistantDrugs, setResistantDrugs, d.value);
+                           if (!resistantDrugs.includes(d.value)) setAdvTherapyRes(true);
+                         }}
                 danger />
             ))}
           </div>
@@ -548,6 +571,7 @@ export default function ClinicalRecordForm({
       </Card>
 
       {/* ── Surgeries ─────────────────────────────────────────────── */}
+      {abdominalSurgeries === true && (
       <Card title="Хірургічні втручання">
         <div className="space-y-6">
           {surgeries.map((s, i) => (
@@ -590,13 +614,13 @@ export default function ClinicalRecordForm({
               </div>
             </div>
           ))}
-          <button type="button"
-            onClick={() => setSurgeries([...surgeries, { date: '', name: '', description: '' }])}
+          <button type="button" onClick={() => setSurgeries([...surgeries, { date: new Date().toLocaleDateString('sv-SE'), name: '', description: '' }])}
             className="text-sm text-brand hover:underline">
             + Додати операцію
           </button>
         </div>
       </Card>
+      )}
 
       {/* ── Lab values ────────────────────────────────────────────── */}
       <Card title="Лабораторні показники">
@@ -759,7 +783,7 @@ function LabSection({ label, rows, setRows, setRow }: {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="field-label">{label}</label>
-        <button type="button" onClick={() => setRows([...rows, { value: '', date: '' }])}
+        <button type="button" onClick={() => setRows([...rows, { value: '', date: new Date().toLocaleDateString('sv-SE') }])}
           className="text-xs text-brand hover:underline">+ додати</button>
       </div>
       {rows.map((row, i) => (
