@@ -179,8 +179,12 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
   const s = statusMap[patient.status] ?? { label: patient.status, cls: 'bg-gray-100 text-gray-600' };
 
   // Collect all surgeries across all clinical records
-  const allSurgeries = clinicalRecords.flatMap(r => r.surgeries)
-    .sort((a, b) => a.operation_date.localeCompare(b.operation_date));
+  const allSurgeries = Array.from(
+      new Map(
+          clinicalRecords.flatMap(r => r.surgeries)
+              .map(s => [`${s.operation_date}|${s.operation_name ?? ''}`, s] as const),
+      ).values(),
+  ).sort((a, b) => a.operation_date.localeCompare(b.operation_date));
 
   // Collect all lab results: clinical records (doctor-added) + standalone
   // Bug 7 fix: keep rawId for future DELETE calls; use `key` as React key only
@@ -209,8 +213,37 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
   const hbiSev = cdSeverity(latestCd?.harvey_bradshaw ?? null);
   const pmSev  = ucSeverity(latestUc?.partial_mayo ?? null);
 
+  type GeneralInfo = {
+    id: number;
+    created_at: string;
+    first_symptoms_date?: string | null;
+    first_symptoms_desc?: string | null;
+    possible_factors?: string | null;
+    constipation_on_flare?: boolean | null;
+    constipation_stool_freq?: string | null;
+  };
+
+  const activityRows = [
+    ...ucRecords.map(r => ({
+      key: `u${r.id}`, date: r.created_at, index: 'Partial Mayo', value: r.partial_mayo,
+      sev: ucSeverity(r.partial_mayo ?? null),
+      detail: r.extent ? (extentLabel[r.extent] ?? r.extent) : '—',
+    })),
+    ...cdRecords.map(r => ({
+      key: `c${r.id}`, date: r.created_at, index: 'Харві-Бредшоу', value: r.harvey_bradshaw,
+      sev: cdSeverity(r.harvey_bradshaw ?? null),
+      detail: r.localization ? (localizationLabel[r.localization] ?? r.localization) : '—',
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
   const backHref =
     session.role === 'ADMIN' ? '/admin/patients' : session.role === 'MODERATOR' ? '/moderator/patients' : '/doctor';
+
+
+  const basePath =
+      session.role === 'ADMIN' ? '/admin/patients'
+          : session.role === 'MODERATOR' ? '/moderator/patients'
+              : '/doctor/patients';
 
   return (
     <div className="space-y-6">
@@ -278,7 +311,7 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                 value={`${(patient.weight / ((patient.height / 100) ** 2)).toFixed(1)} кг/м²`} />
             )}
             <Row label="Регіон"        value={patient.region?.name ?? '—'} />
-            <Row label="Email"         value={patient.email} />
+            {patient.email && <Row label="Email" value={patient.email} />}
             <Row label="Лікар"         value={patient.doctor
               ? `${patient.doctor.last_name} ${patient.doctor.first_name}` : '—'} />
             <Row label="Статус"        value={s.label} />
@@ -585,11 +618,17 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                   <th className="px-4 py-3 font-medium">Тип</th>
                   <th className="px-4 py-3 font-medium">PRO2</th>
                   <th className="px-4 py-3 font-medium">Стан</th>
+                  <th className="px-4 py-3 font-medium">Перші симптоми (дата)</th>
+                  <th className="px-4 py-3 font-medium">Які симптоми</th>
+                  <th className="px-4 py-3 font-medium">Фактори</th>
+                  <th className="px-4 py-3 font-medium">Закрепи</th>
+                  <th className="px-4 py-3 font-medium">Частота стулу</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {[...assessments].reverse().map(a => {
                   const sev = a.pro2_score != null ? pro2Severity(a.pro2_score, a.assessment_type) : null;
+                  const g = a as unknown as GeneralInfo;
                   return (
                     <tr key={a.id}>
                       <td className="px-4 py-3">{new Date(a.created_at).toLocaleDateString('uk-UA')}</td>
@@ -598,10 +637,19 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                       <td className="px-4 py-3">
                         {sev && (
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sev.bg} ${sev.text}`}>
-                            {sev.label}
+                                                        {sev.label}
                           </span>
                         )}
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {g.first_symptoms_date ? new Date(g.first_symptoms_date).toLocaleDateString('uk-UA') : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 max-w-[200px] whitespace-pre-wrap">{g.first_symptoms_desc || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600 max-w-[200px] whitespace-pre-wrap">{g.possible_factors || '—'}</td>
+                      <td className="px-4 py-3">
+                        {g.constipation_on_flare == null ? '—' : g.constipation_on_flare ? 'Так' : 'Ні'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{g.constipation_stool_freq || '—'}</td>
                     </tr>
                   );
                 })}
@@ -612,8 +660,42 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
       </Card>
 
       {/* ── Клінічні записи — список ── */}
-      {clinicalRecords.length > 1 && (
-        <Card title={`Всі клінічні записи (${clinicalRecords.length})`}>
+      {/* ── Історія активності ── */}
+      {activityRows.length > 0 && (
+          <Card title={`Історія активності (${activityRows.length})`}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-xs">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Дата</th>
+                  <th className="px-4 py-3 font-medium">Індекс</th>
+                  <th className="px-4 py-3 font-medium">Значення</th>
+                  <th className="px-4 py-3 font-medium">Стан</th>
+                  <th className="px-4 py-3 font-medium">Поширеність / локалізація</th>
+                </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                {activityRows.map(r => (
+                    <tr key={r.key} className="hover:bg-gray-50/50">
+                      <td className="px-4 py-3 whitespace-nowrap">{new Date(r.date).toLocaleDateString('uk-UA')}</td>
+                      <td className="px-4 py-3 text-gray-600">{r.index}</td>
+                      <td className="px-4 py-3 font-medium">{r.value ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {r.sev
+                            ? <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${r.sev.cls}`}>{r.sev.label}</span>
+                            : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{r.detail}</td>
+                    </tr>
+                ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+      )}
+      {clinicalRecords.length > 0 && (
+          <Card title={`Всі клінічні записи (${clinicalRecords.length})`}
+                subtitle="Натисніть на запис, щоб переглянути його повністю">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-gray-50 text-gray-500 text-xs">
@@ -624,6 +706,7 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                   <th className="px-4 py-3 font-medium">Стероїдорезистентність</th>
                   <th className="px-4 py-3 font-medium">Операції</th>
                   <th className="px-4 py-3 font-medium">СРБ</th>
+                  <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -632,7 +715,9 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                   return (
                     <tr key={r.id} className="hover:bg-gray-50/50">
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {new Date(r.created_at).toLocaleDateString('uk-UA')}
+                        <Link href={`${basePath}/${id}/clinical/${r.id}`} className="text-brand hover:underline">
+                          {new Date(r.created_at).toLocaleDateString('uk-UA')}
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-gray-600 max-w-[180px] truncate">
                         {r.treatments.map(t => drugLabel[t.drug] ?? t.drug).join(', ') || '—'}
@@ -645,7 +730,7 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                       </td>
                       <td className="px-4 py-3">
                         {r.surgeries.length > 0
-                          ? r.surgeries.map(s => new Date(s.operation_date).toLocaleDateString('uk-UA')).join(', ')
+                            ? r.surgeries.map(s => `${s.operation_name ?? 'Операція'} (${new Date(s.operation_date).toLocaleDateString('uk-UA')})`).join(', ')
                           : '—'}
                       </td>
                       <td className="px-4 py-3">
@@ -653,7 +738,10 @@ export default async function PatientDetails({ params }: { params: Promise<{ id:
                           ? <span className={latestCrp.value > 5 ? 'text-red-600 font-medium' : 'text-green-600'}>
                               {latestCrp.value} мг/л
                             </span>
-                          : '—'}
+                            : '—'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <Link href={`${basePath}/${id}/clinical/${r.id}`} className="text-brand hover:underline">Переглянути →</Link>
                       </td>
                     </tr>
                   );

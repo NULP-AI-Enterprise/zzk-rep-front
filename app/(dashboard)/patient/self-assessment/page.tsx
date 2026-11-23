@@ -17,6 +17,11 @@ export default function PatientSelfAssessment() {
   const [cdStool, setCdStool] = useState(0);
   const [ucBleeding, setUcBleeding] = useState(0);
   const [ucFreq, setUcFreq] = useState(0);
+  const [firstDate, setFirstDate] = useState('');
+  const [firstDesc, setFirstDesc] = useState('');
+  const [factors, setFactors] = useState('');
+  const [constip, setConstip] = useState<'' | 'yes' | 'no'>('');
+  const [constipFreq, setConstipFreq] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -49,6 +54,11 @@ export default function PatientSelfAssessment() {
         body.uc_rectal_bleeding = ucBleeding;
         body.uc_defecation_freq = ucFreq;
       }
+      if (firstDate) body.first_symptoms_date = firstDate;
+      if (firstDesc.trim()) body.first_symptoms_desc = firstDesc.trim();
+      if (factors.trim()) body.possible_factors = factors.trim();
+      if (constip) body.constipation_on_flare = constip === 'yes';
+      if (constip === 'yes' && constipFreq.trim()) body.constipation_stool_freq = constipFreq.trim();
       const res = await fetch('/api/self-assessments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,6 +138,28 @@ export default function PatientSelfAssessment() {
           </>
         )}
 
+        <div className="space-y-4 border-t pt-6">
+          <h2 className="font-bold text-gray-800">Загальні відомості (необов&apos;язково)</h2>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Коли з&apos;явилися перші симптоми</span>
+            <input type="date" max={new Date().toISOString().slice(0, 10)} value={firstDate} onChange={e => setFirstDate(e.target.value)}
+                   className="w-full border-b border-black/50 bg-transparent py-2 outline-none focus:border-brand" /></label>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Які симптоми були першими</span>
+            <textarea value={firstDesc} onChange={e => setFirstDesc(e.target.value)} rows={2}
+                      className="w-full border border-gray-200 rounded-xl p-2 outline-none focus:border-brand" /></label>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Які фактори могли вплинути</span>
+            <textarea value={factors} onChange={e => setFactors(e.target.value)} rows={2}
+                      className="w-full border border-gray-200 rounded-xl p-2 outline-none focus:border-brand" /></label>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Чи є закрепи при загостреннях</span>
+            <select value={constip} onChange={e => setConstip(e.target.value as '' | 'yes' | 'no')}
+                    className="w-full border-b border-black/50 bg-transparent py-2 outline-none focus:border-brand">
+              <option value="">—</option><option value="yes">Так</option><option value="no">Ні</option>
+            </select></label>
+          {constip === 'yes' && (
+              <label className="block space-y-1 text-sm"><span className="font-medium">Частота стулу при закрепах</span>
+                <input value={constipFreq} onChange={e => setConstipFreq(e.target.value)}
+                       className="w-full border-b border-black/50 bg-transparent py-2 outline-none focus:border-brand" /></label>
+          )}
+        </div>
         <div className={`flex items-center justify-between p-4 rounded-xl border ${severity.bg}`}>
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">
